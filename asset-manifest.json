@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.css": "/schuber/static/css/main.86ce0de2.css",
-    "main.js": "/schuber/static/js/main.12f1f03c.js",
-    "index.html": "/schuber/index.html",
-    "main.86ce0de2.css.map": "/schuber/static/css/main.86ce0de2.css.map",
-    "main.12f1f03c.js.map": "/schuber/static/js/main.12f1f03c.js.map"
+    "main.css": "/static/css/main.86ce0de2.css",
+    "main.js": "/static/js/main.12f1f03c.js",
+    "index.html": "/index.html",
+    "main.86ce0de2.css.map": "/static/css/main.86ce0de2.css.map",
+    "main.12f1f03c.js.map": "/static/js/main.12f1f03c.js.map"
   },
   "entrypoints": [
     "static/css/main.86ce0de2.css",
