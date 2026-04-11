@@ -1,106 +1,143 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api';
-import { supabase } from '../supabase'; // ✅ ADD THIS
+// frontend/src/context/AuthContext.js
+
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase, getProfile, signInWithGoogle, signOut } from '../supabase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 fetch profile from supabase
-  const getProfile = async (userId) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    console.log("PROFILE:", data, error);
-
-    if (error) return null;
-    return data;
-  };
-
   useEffect(() => {
-    const token = localStorage.getItem('schuber_token');
+    console.log("Auth init...");
 
-    if (token) {
-      api.get('/auth/me')
-        .then(async (u) => {
-          // ✅ fetch profile from supabase
-          const profile = await getProfile(u.id);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      bootstrap(session);
+    });
 
-          if (!profile) {
-            console.warn("No profile found");
-            setUser(null);
-            return;
-          }
+    // Listen to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => bootstrap(session)
+    );
 
-          // ✅ merge user + profile
-          setUser({
-            ...u,
-            role: profile.role,
-            full_name: profile.full_name
-          });
-        })
-        .catch(() => {
-          localStorage.removeItem('schuber_token');
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
+    // 🔥 Safety fallback (prevents infinite loading)
+    const timeout = setTimeout(() => {
+      console.warn("⚠️ Force stopping loading");
       setLoading(false);
-    }
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
-  const login = async (email, password) => {
-    const data = await api.post('/auth/login', { email, password });
+  // ✅ FINAL FIXED BOOTSTRAP
+  async function bootstrap(session) {
+    try {
+      if (session?.user) {
+        setUser(session.user);
 
-    localStorage.setItem('schuber_token', data.token);
+        const prof = await getProfile(session.user.id).catch((err) => {
+          console.error("Profile fetch error:", err);
+          return null;
+        });
 
-    // ✅ fetch profile
-    const profile = await getProfile(data.user.id);
+        console.log("PROFILE:", prof);
 
-    const mergedUser = {
+        // ✅ PRODUCTION FIX: handle broken session
+        if (!prof || !prof.role) {
+          console.warn("⚠️ Invalid profile → logging out user");
+
+          await supabase.auth.signOut();
+
+          setUser(null);
+          setProfile(null);
+          return;
+        }
+
+        setProfile(prof);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    } catch (err) {
+      console.error("Auth error:", err);
+      setUser(null);
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Auth methods ──
+
+  async function login(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+
+    const prof = await getProfile(data.user.id).catch(() => null);
+
+    return {
       ...data.user,
-      role: profile?.role ?? 'parent',
-      full_name: profile?.full_name
+      role: prof?.role ?? 'parent',
     };
+  }
 
-    setUser(mergedUser);
+  async function register(email, password, fullName, role = 'parent') {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } }
+    });
 
-    return mergedUser;
-  };
+    if (error) throw error;
 
-  const register = async (form) => {
-    const data = await api.post('/auth/register', form);
+    if (data.user) {
+      await supabase
+  .from('profiles')
+  .upsert({
+    id: data.user.id,
+    role,
+    full_name: fullName
+  });
+    }
 
-    localStorage.setItem('schuber_token', data.token);
+    return data.user;
+  }
 
-    // ✅ fetch profile after register
-    const profile = await getProfile(data.user.id);
+  async function getAuthHeader() {
+    const { data: { session } } = await supabase.auth.getSession();
 
-    const mergedUser = {
-      ...data.user,
-      role: profile?.role ?? 'parent',
-      full_name: profile?.full_name
-    };
+    return session
+      ? { Authorization: `Bearer ${session.access_token}` }
+      : {};
+  }
 
-    setUser(mergedUser);
-
-    return mergedUser;
-  };
-
-  const logout = () => {
-    localStorage.removeItem('schuber_token');
-    setUser(null);
+  const value = {
+    user,
+    profile,
+    role: profile?.role ?? null,
+    loading,
+    login,
+    register,
+    signOut,
+    signInWithGoogle,
+    getAuthHeader,
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={value}>
+      {/* ✅ FIX: never render blank screen */}
       {loading ? (
-        <div style={{ textAlign: "center", marginTop: "50px" }}>
+        <div style={{ padding: "20px", textAlign: "center" }}>
           Loading...
         </div>
       ) : (
