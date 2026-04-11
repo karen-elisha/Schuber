@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { signInWithGoogle } from '../supabase';
 
 const demos = [
   { label: '👨‍👩‍👧 Parent', email: 'priya@example.com', password: 'parent123' },
@@ -9,7 +10,7 @@ const demos = [
 ];
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -20,14 +21,26 @@ export default function LoginPage() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const user = await login(form.email, form.password);
-      navigate(`/${user.role}`);
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
+      const { supabase } = await import('../supabase');
+      const { error } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+      if (error) throw error;
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleGoogle = () => {
-    alert('Google Sign-In: Connect your Google OAuth provider in AuthContext to enable this feature.');
+  const handleGoogle = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError('Google sign-in failed. Please try again.');
+    }
   };
 
   return (

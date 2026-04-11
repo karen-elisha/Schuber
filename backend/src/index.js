@@ -5,7 +5,7 @@ const authRoutes = require('./routes/auth');
 const tripRoutes = require('./routes/trips');
 const driverRoutes = require('./routes/drivers');
 const studentRoutes = require('./routes/students');
-const db = require('./db');
+const {db} = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 4000;

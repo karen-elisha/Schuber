@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "name": "schuber",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "installCommand": "npm ci",
+  "framework": "create-react-app",
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://schuber-api.onrender.com/api/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "REACT_APP_SUPABASE_URL":       "@react_app_supabase_url",
+    "REACT_APP_SUPABASE_ANON_KEY":  "@react_app_supabase_anon_key",
+    "REACT_APP_API_URL":            "@react_app_api_url"
+  }
+}
