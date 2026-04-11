@@ -75,7 +75,8 @@ jobs:
           npm install
           echo "Starting backend..."
           npm start &
-          sleep 15
+          sleep 25
+          echo "Checking server..."
           curl http://localhost:4000 || echo "Server not responding"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
