@@ -56,7 +56,7 @@ jobs:
           REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
           REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
 
-  # ── 3. Python Tests (FIXED) ─────────────
+  # ── 3. Python Tests ─────────────────────
   test-python:
     runs-on: ubuntu-latest
     needs: [test-backend]
@@ -133,15 +133,25 @@ jobs:
           --scope=${{ secrets.VERCEL_ORG_ID }}
         working-directory: frontend
 
+      # ✅ FIX: Added env variables here
       - name: Build
         run: vercel build --prod \
           --token=${{ secrets.VERCEL_TOKEN }}
         working-directory: frontend
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
 
+      # ✅ Optional but recommended
       - name: Deploy
         run: vercel deploy --prebuilt --prod \
           --token=${{ secrets.VERCEL_TOKEN }}
         working-directory: frontend
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
 
   # ── 6. Render Deploy ───────────────────
   deploy-render:
