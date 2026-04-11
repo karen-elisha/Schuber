@@ -141,6 +141,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - run: npm install -g vercel
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: frontend
 
       - name: Pull config
         run: vercel pull --yes --environment=production
