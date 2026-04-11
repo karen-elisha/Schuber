@@ -102,9 +102,12 @@ export function AuthProvider({ children }) {
 
     if (data.user) {
       await supabase
-        .from('profiles')
-        .update({ role, full_name: fullName })
-        .eq('id', data.user.id);
+  .from('profiles')
+  .upsert({
+    id: data.user.id,
+    role,
+    full_name: fullName
+  });
     }
 
     return data.user;
