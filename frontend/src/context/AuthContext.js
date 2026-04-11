@@ -10,30 +10,56 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("Auth init...");
+
+    // Fetch current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       bootstrap(session);
     });
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => bootstrap(session)
     );
 
-    return () => subscription.unsubscribe();
+    // 🔥 SAFETY: prevent infinite loading
+    const timeout = setTimeout(() => {
+      console.log("⚠️ Force stopping loading");
+      setLoading(false);
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   async function bootstrap(session) {
-    if (session?.user) {
-      setUser(session.user);
-      const prof = await getProfile(session.user.id).catch(() => null);
-      setProfile(prof);
-    } else {
-      setUser(null);
-      setProfile(null);
+    console.log("BOOTSTRAP START", session);
+
+    try {
+      if (session?.user) {
+        setUser(session.user);
+
+        const prof = await getProfile(session.user.id).catch((err) => {
+          console.error("Profile fetch error:", err);
+          return null;
+        });
+
+        setProfile(prof);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    } catch (err) {
+      console.error("Bootstrap error:", err);
+    } finally {
+      console.log("BOOTSTRAP DONE");
+      setLoading(false);
     }
-    setLoading(false);
   }
 
-  // ── Kept for backward compatibility with existing components ──
+  // ── Auth methods ──
 
   async function login(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -41,7 +67,7 @@ export function AuthProvider({ children }) {
       password,
     });
     if (error) throw error;
-    // Return shape that your old code expects: { role, ... }
+
     const prof = await getProfile(data.user.id).catch(() => null);
     return { ...data.user, role: prof?.role ?? 'parent' };
   }
@@ -52,30 +78,31 @@ export function AuthProvider({ children }) {
       password,
       options: { data: { full_name: fullName } }
     });
+
     if (error) throw error;
-    // Set role in profiles table after sign up
+
     if (data.user) {
       await supabase
         .from('profiles')
         .update({ role, full_name: fullName })
         .eq('id', data.user.id);
     }
+
     return data.user;
   }
 
   async function getAuthHeader() {
     const { data: { session } } = await supabase.auth.getSession();
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+    return session
+      ? { Authorization: `Bearer ${session.access_token}` }
+      : {};
   }
 
   const value = {
-    // State
     user,
     profile,
     role: profile?.role ?? null,
     loading,
-
-    // Auth methods (same names your old code used)
     login,
     register,
     signOut,
@@ -85,7 +112,13 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading ? (
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Loading...
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 }
