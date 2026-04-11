@@ -1,4 +1,5 @@
 // frontend/src/context/AuthContext.js
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, getProfile, signInWithGoogle, signOut } from '../supabase';
 
@@ -12,19 +13,19 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     console.log("Auth init...");
 
-    // Fetch current session
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       bootstrap(session);
     });
 
-    // Listen for auth changes
+    // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => bootstrap(session)
     );
 
-    // 🔥 SAFETY: prevent infinite loading
+    // 🔥 Safety fallback (prevents infinite loading)
     const timeout = setTimeout(() => {
-      console.log("⚠️ Force stopping loading");
+      console.warn("⚠️ Force stopping loading");
       setLoading(false);
     }, 5000);
 
@@ -34,9 +35,8 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // ✅ FINAL FIXED BOOTSTRAP
   async function bootstrap(session) {
-    console.log("BOOTSTRAP START", session);
-
     try {
       if (session?.user) {
         setUser(session.user);
@@ -46,15 +46,29 @@ export function AuthProvider({ children }) {
           return null;
         });
 
+        console.log("PROFILE:", prof);
+
+        // ✅ PRODUCTION FIX: handle broken session
+        if (!prof || !prof.role) {
+          console.warn("⚠️ Invalid profile → logging out user");
+
+          await supabase.auth.signOut();
+
+          setUser(null);
+          setProfile(null);
+          return;
+        }
+
         setProfile(prof);
       } else {
         setUser(null);
         setProfile(null);
       }
     } catch (err) {
-      console.error("Bootstrap error:", err);
+      console.error("Auth error:", err);
+      setUser(null);
+      setProfile(null);
     } finally {
-      console.log("BOOTSTRAP DONE");
       setLoading(false);
     }
   }
@@ -66,10 +80,15 @@ export function AuthProvider({ children }) {
       email,
       password,
     });
+
     if (error) throw error;
 
     const prof = await getProfile(data.user.id).catch(() => null);
-    return { ...data.user, role: prof?.role ?? 'parent' };
+
+    return {
+      ...data.user,
+      role: prof?.role ?? 'parent',
+    };
   }
 
   async function register(email, password, fullName, role = 'parent') {
@@ -93,6 +112,7 @@ export function AuthProvider({ children }) {
 
   async function getAuthHeader() {
     const { data: { session } } = await supabase.auth.getSession();
+
     return session
       ? { Authorization: `Bearer ${session.access_token}` }
       : {};
@@ -112,6 +132,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
+      {/* ✅ FIX: never render blank screen */}
       {loading ? (
         <div style={{ padding: "20px", textAlign: "center" }}>
           Loading...

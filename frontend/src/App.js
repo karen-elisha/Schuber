@@ -10,6 +10,7 @@ import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import DriverVerificationPage from './pages/DriverVerificationPage';
 
+// 🔐 Protected Route
 function ProtectedRoute({ children, roles }) {
   const { user, profile, loading } = useAuth();
 
@@ -34,49 +35,64 @@ function ProtectedRoute({ children, roles }) {
 
   if (!user) return <Navigate to="/login" replace />;
 
-  // ✅ FIX: use profile.role instead of user.role
-  if (roles && !roles.includes(profile?.role)) {
+  // ✅ SAFE ROLE CHECK
+  if (roles && (!profile?.role || !roles.includes(profile.role))) {
     return <Navigate to="/" replace />;
   }
 
   return children;
 }
 
+// 🌐 Routes
 function AppRoutes() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+
+  // ✅ WAIT until profile is ready
+  if (loading || (user && !profile)) {
+    return (
+      <div style={{ textAlign: "center", marginTop: "50px" }}>
+        Loading app...
+      </div>
+    );
+  }
 
   return (
     <Routes>
-      {/* ✅ FIX: use profile.role */}
+
+      {/* HOME */}
       <Route
         path="/"
         element={
-          user
-            ? <Navigate to={`/${profile?.role}`} replace />
+          user && profile?.role
+            ? <Navigate to={`/${profile.role}`} replace />
             : <LandingPage />
         }
       />
 
+      {/* LOGIN */}
       <Route
         path="/login"
         element={
-          user
-            ? <Navigate to={`/${profile?.role}`} replace />
+          user && profile?.role
+            ? <Navigate to={`/${profile.role}`} replace />
             : <LoginPage />
         }
       />
 
+      {/* REGISTER */}
       <Route
         path="/register"
         element={
-          user
-            ? <Navigate to={`/${profile?.role}`} replace />
+          user && profile?.role
+            ? <Navigate to={`/${profile.role}`} replace />
             : <RegisterPage />
         }
       />
 
+      {/* PUBLIC */}
       <Route path="/driver-verification" element={<DriverVerificationPage />} />
 
+      {/* PROTECTED */}
       <Route
         path="/parent/*"
         element={
@@ -104,11 +120,13 @@ function AppRoutes() {
         }
       />
 
+      {/* FALLBACK */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
+// 🚀 Main App
 export default function App() {
   return (
     <AuthProvider>
