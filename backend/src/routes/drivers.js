@@ -1,44 +1,108 @@
-const router = require('express').Router();
-const { db } = require('../db');
-const { auth } = require('../middleware');
+const router   = require('express').Router();
+const supabase = require('../db');
+const { authenticate: auth } = require('../middleware');
 
-router.get('/', auth, (req, res) => {
-  const drivers = db.prepare(`
-    SELECT d.*, u.name, u.email, u.phone
-    FROM drivers d JOIN users u ON d.user_id = u.id
-  `).all();
-  res.json(drivers);
+// ─────────────────────────────
+// 📋 Get all drivers (admin)
+// ─────────────────────────────
+router.get('/', auth, async (req, res) => {
+  try {
+    const { data: drivers, error } = await supabase
+      .from('drivers')
+      .select('*, profiles(full_name, email)');
+
+    if (error) throw error;
+    res.json(drivers || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/me', auth, (req, res) => {
-  if (req.user.role !== 'driver') return res.status(403).json({ error: 'Forbidden' });
-  const driver = db.prepare(`SELECT d.*, u.name, u.email, u.phone FROM drivers d JOIN users u ON d.user_id = u.id WHERE d.user_id = ?`).get(req.user.id);
-  res.json(driver);
+// ─────────────────────────────
+// 👤 Get own driver profile
+// ─────────────────────────────
+router.get('/me', auth, async (req, res) => {
+  if (req.user.role !== 'driver')
+    return res.status(403).json({ error: 'Forbidden' });
+
+  try {
+    const { data: driver, error } = await supabase
+      .from('drivers')
+      .select('*, profiles(full_name, email)')
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (error) throw error;
+    res.json(driver);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.patch('/location', auth, (req, res) => {
-  if (req.user.role !== 'driver') return res.status(403).json({ error: 'Forbidden' });
+// ─────────────────────────────
+// 📍 Update GPS location
+// ─────────────────────────────
+router.patch('/location', auth, async (req, res) => {
+  if (req.user.role !== 'driver')
+    return res.status(403).json({ error: 'Forbidden' });
+
   const { lat, lng } = req.body;
-  const driver = db.prepare('SELECT id FROM drivers WHERE user_id = ?').get(req.user.id);
-  db.prepare('UPDATE drivers SET lat = ?, lng = ? WHERE id = ?').run(lat, lng, driver.id);
-  res.json({ success: true });
+  if (lat == null || lng == null)
+    return res.status(400).json({ error: 'lat and lng are required' });
+
+  try {
+    const { error } = await supabase
+      .from('drivers')
+      .update({ lat, lng, updated_at: new Date().toISOString() })
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.patch('/status', auth, (req, res) => {
-  if (req.user.role !== 'driver') return res.status(403).json({ error: 'Forbidden' });
-  const driver = db.prepare('SELECT id FROM drivers WHERE user_id = ?').get(req.user.id);
-  db.prepare('UPDATE drivers SET status = ? WHERE id = ?').run(req.body.status, driver.id);
-  res.json({ success: true });
+// ─────────────────────────────
+// 🔄 Update online status
+// ─────────────────────────────
+router.patch('/status', auth, async (req, res) => {
+  if (req.user.role !== 'driver')
+    return res.status(403).json({ error: 'Forbidden' });
+
+  try {
+    const { error } = await supabase
+      .from('drivers')
+      .update({ is_online: req.body.is_online })
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.patch('/profile', auth, (req, res) => {
-  if (req.user.role !== 'driver') return res.status(403).json({ error: 'Forbidden' });
-  const { license_no, vehicle_no, vehicle_model, capacity, route } = req.body;
-  const driver = db.prepare('SELECT id FROM drivers WHERE user_id = ?').get(req.user.id);
-  db.prepare('UPDATE drivers SET license_no=?, vehicle_no=?, vehicle_model=?, capacity=?, route=? WHERE id=?').run(
-    license_no, vehicle_no, vehicle_model, capacity, route, driver.id
-  );
-  res.json({ success: true });
+// ─────────────────────────────
+// ✏️ Update driver profile
+// ─────────────────────────────
+router.patch('/profile', auth, async (req, res) => {
+  if (req.user.role !== 'driver')
+    return res.status(403).json({ error: 'Forbidden' });
+
+  const { license_no, vehicle_no, route } = req.body;
+
+  try {
+    const { error } = await supabase
+      .from('drivers')
+      .update({ license_no, vehicle_no, route, updated_at: new Date().toISOString() })
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

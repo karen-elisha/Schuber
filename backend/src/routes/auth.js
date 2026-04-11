@@ -1,39 +1,59 @@
 const router = require('express').Router();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { db } = require('../db');
-const { auth, SECRET } = require('../middleware');
+const supabase = require('../db');
 
-router.post('/login', (req, res) => {
+// ✅ Use correct middleware
+const { authenticate: auth } = require('../middleware');
+
+
+// ─────────────────────────────
+// 🔐 LOGIN (Supabase)
+// ─────────────────────────────
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  if (!user || !bcrypt.compareSync(password, user.password))
-    return res.status(401).json({ error: 'Invalid credentials' });
 
-  const token = jwt.sign({ id: user.id, role: user.role, name: user.name, email: user.email }, SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone } });
-});
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
 
-router.post('/register', (req, res) => {
-  const { name, email, password, role, phone } = req.body;
-  if (!name || !email || !password || !role) return res.status(400).json({ error: 'Missing fields' });
-  const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-  if (exists) return res.status(409).json({ error: 'Email already registered' });
-
-  const hashed = bcrypt.hashSync(password, 10);
-  const result = db.prepare('INSERT INTO users (name,email,password,role,phone) VALUES (?,?,?,?,?)').run(name, email, hashed, role, phone || null);
-
-  if (role === 'driver') {
-    db.prepare('INSERT INTO drivers (user_id) VALUES (?)').run(result.lastInsertRowid);
+  if (error) {
+    return res.status(401).json({ error: error.message });
   }
 
-  const token = jwt.sign({ id: result.lastInsertRowid, role, name, email }, SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: result.lastInsertRowid, name, email, role, phone } });
+  res.json({
+    token: data.session.access_token,
+    user: data.user
+  });
 });
 
+
+// ─────────────────────────────
+// 📝 REGISTER (Supabase)
+// ─────────────────────────────
+router.post('/register', async (req, res) => {
+  const { email, password } = req.body;
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  res.json({
+    message: "User registered",
+    user: data.user
+  });
+});
+
+
+// ─────────────────────────────
+// 👤 GET CURRENT USER
+// ─────────────────────────────
 router.get('/me', auth, (req, res) => {
-  const user = db.prepare('SELECT id,name,email,role,phone,created_at FROM users WHERE id = ?').get(req.user.id);
-  res.json(user);
+  res.json(req.user);
 });
 
 module.exports = router;

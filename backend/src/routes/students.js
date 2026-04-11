@@ -1,50 +1,122 @@
-const router = require('express').Router();
-const { db } = require('../db');
-const { auth } = require('../middleware');
+const router   = require('express').Router();
+const supabase = require('../db');
+const { authenticate: auth } = require('../middleware');
 
-router.get('/', auth, (req, res) => {
+// ─────────────────────────────
+// 📋 Get students
+// ─────────────────────────────
+router.get('/', auth, async (req, res) => {
   const { role, id } = req.user;
-  let students;
-  if (role === 'parent') {
-    students = db.prepare(`
-      SELECT s.*, d.vehicle_no, d.vehicle_model, d.status as van_status, d.lat, d.lng, u.name as driver_name, u.phone as driver_phone
-      FROM students s
-      LEFT JOIN drivers d ON s.van_id = d.id
-      LEFT JOIN users u ON d.user_id = u.id
-      WHERE s.parent_id = ?
-    `).all(id);
-  } else if (role === 'driver') {
-    const driver = db.prepare('SELECT id FROM drivers WHERE user_id = ?').get(id);
-    if (!driver) return res.json([]);
-    students = db.prepare(`
-      SELECT s.*, u.name as parent_name, u.phone as parent_phone
-      FROM students s
-      JOIN users u ON s.parent_id = u.id
-      WHERE s.van_id = ?
-    `).all(driver.id);
-  } else {
-    students = db.prepare(`SELECT s.*, u.name as parent_name FROM students s JOIN users u ON s.parent_id = u.id`).all();
+
+  try {
+    if (role === 'parent') {
+      const { data: students, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('parent_id', id);
+
+      if (error) throw error;
+      return res.json(students || []);
+
+    } else if (role === 'driver') {
+      const { data: driver } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('user_id', id)
+        .single();
+
+      if (!driver) return res.json([]);
+
+      // Get students who have been on trips with this driver
+      const { data: tripStudents } = await supabase
+        .from('trip_students')
+        .select('student_id, trips!inner(driver_id)')
+        .eq('trips.driver_id', driver.id);
+
+      if (!tripStudents?.length) return res.json([]);
+
+      const studentIds = [...new Set(tripStudents.map(ts => ts.student_id))];
+      const { data: students, error } = await supabase
+        .from('students')
+        .select('*, profiles(full_name)')
+        .in('id', studentIds);
+
+      if (error) throw error;
+      return res.json(students || []);
+
+    } else {
+      // Admin — get all students
+      const { data: students, error } = await supabase
+        .from('students')
+        .select('*, profiles(full_name)');
+
+      if (error) throw error;
+      return res.json(students || []);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(students);
 });
 
-router.post('/', auth, (req, res) => {
-  if (req.user.role !== 'parent') return res.status(403).json({ error: 'Forbidden' });
-  const { name, school, grade, pickup_address } = req.body;
-  const result = db.prepare('INSERT INTO students (name,parent_id,school,grade,pickup_address) VALUES (?,?,?,?,?)').run(
-    name, req.user.id, school, grade, pickup_address
-  );
-  res.json({ id: result.lastInsertRowid, name, school, grade, pickup_address });
+// ─────────────────────────────
+// ➕ Add student (parent only)
+// ─────────────────────────────
+router.post('/', auth, async (req, res) => {
+  if (req.user.role !== 'parent')
+    return res.status(403).json({ error: 'Forbidden' });
+
+  const { name, school, grade } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+
+  try {
+    const { data: student, error } = await supabase
+      .from('students')
+      .insert({ name, school, grade, parent_id: req.user.id })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(student);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/notifications', auth, (req, res) => {
-  const notifs = db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 20').all(req.user.id);
-  res.json(notifs);
+// ─────────────────────────────
+// 🔔 Get notifications
+// ─────────────────────────────
+router.get('/notifications', auth, async (req, res) => {
+  try {
+    const { data: notifs, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    res.json(notifs || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.patch('/notifications/:id/read', auth, (req, res) => {
-  db.prepare('UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
-  res.json({ success: true });
+// ─────────────────────────────
+// ✅ Mark notification read
+// ─────────────────────────────
+router.patch('/notifications/:id/read', auth, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

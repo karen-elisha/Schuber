@@ -1,113 +1,185 @@
-const router = require('express').Router();
-const { db } = require('../db');
-const { auth } = require('../middleware');
+const router  = require('express').Router();
+const supabase = require('../db');
+const { authenticate: auth } = require('../middleware');
 
-// Get trips for current user
-router.get('/', auth, (req, res) => {
+// ─────────────────────────────
+// 📋 Get trips for current user
+// ─────────────────────────────
+router.get('/', auth, async (req, res) => {
   const { role, id } = req.user;
-  let trips;
-  if (role === 'driver') {
-    const driver = db.prepare('SELECT id FROM drivers WHERE user_id = ?').get(id);
-    if (!driver) return res.json([]);
-    trips = db.prepare(`
-      SELECT t.*, u.name as driver_name, d.vehicle_no, d.vehicle_model
-      FROM trips t
-      JOIN drivers d ON t.driver_id = d.id
-      JOIN users u ON d.user_id = u.id
-      WHERE t.driver_id = ?
-      ORDER BY t.date DESC LIMIT 20
-    `).all(driver.id);
-  } else if (role === 'parent') {
-    trips = db.prepare(`
-      SELECT DISTINCT t.*, u.name as driver_name, d.vehicle_no, d.vehicle_model, d.rating
-      FROM trips t
-      JOIN drivers d ON t.driver_id = d.id
-      JOIN users u ON d.user_id = u.id
-      JOIN trip_students ts ON t.id = ts.trip_id
-      JOIN students s ON ts.student_id = s.id
-      WHERE s.parent_id = ?
-      ORDER BY t.date DESC LIMIT 20
-    `).all(id);
-  } else {
-    trips = db.prepare(`
-      SELECT t.*, u.name as driver_name, d.vehicle_no
-      FROM trips t
-      JOIN drivers d ON t.driver_id = d.id
-      JOIN users u ON d.user_id = u.id
-      ORDER BY t.date DESC LIMIT 50
-    `).all();
+
+  try {
+    if (role === 'driver') {
+      const { data: driver } = await supabase
+        .from('drivers').select('id').eq('user_id', id).single();
+      if (!driver) return res.json([]);
+
+      const { data: trips } = await supabase
+        .from('trips').select('*').eq('driver_id', driver.id)
+        .order('created_at', { ascending: false }).limit(20);
+      return res.json(trips || []);
+
+    } else if (role === 'parent') {
+      const { data: students } = await supabase
+        .from('students').select('id').eq('parent_id', id);
+      if (!students?.length) return res.json([]);
+
+      const studentIds = students.map(s => s.id);
+      const { data: tripStudents } = await supabase
+        .from('trip_students').select('trip_id').in('student_id', studentIds);
+      if (!tripStudents?.length) return res.json([]);
+
+      const tripIds = [...new Set(tripStudents.map(ts => ts.trip_id))];
+      const { data: trips } = await supabase
+        .from('trips').select('*').in('id', tripIds)
+        .order('created_at', { ascending: false }).limit(20);
+      return res.json(trips || []);
+
+    } else {
+      const { data: trips } = await supabase
+        .from('trips').select('*')
+        .order('created_at', { ascending: false }).limit(50);
+      return res.json(trips || []);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(trips);
 });
 
-// Get active trip details with students
-router.get('/active', auth, (req, res) => {
+// ─────────────────────────────
+// 🚍 Active trip
+// ─────────────────────────────
+router.get('/active', auth, async (req, res) => {
   const { role, id } = req.user;
-  let trip;
-  if (role === 'driver') {
-    const driver = db.prepare('SELECT id FROM drivers WHERE user_id = ?').get(id);
-    if (!driver) return res.json(null);
-    trip = db.prepare(`SELECT * FROM trips WHERE driver_id = ? AND status = 'in_progress'`).get(driver.id);
-  } else if (role === 'parent') {
-    trip = db.prepare(`
-      SELECT DISTINCT t.*, u.name as driver_name, d.vehicle_no, d.vehicle_model, d.lat, d.lng, d.rating, d.phone as driver_phone
-      FROM trips t
-      JOIN drivers d ON t.driver_id = d.id
-      JOIN users u ON d.user_id = u.id
-      JOIN trip_students ts ON t.id = ts.trip_id
-      JOIN students s ON ts.student_id = s.id
-      WHERE s.parent_id = ? AND t.status = 'in_progress'
-    `).get(id);
+
+  try {
+    let trip = null;
+
+    if (role === 'driver') {
+      const { data: driver } = await supabase
+        .from('drivers').select('id').eq('user_id', id).single();
+      if (!driver) return res.json(null);
+
+      const { data } = await supabase
+        .from('trips').select('*')
+        .eq('driver_id', driver.id).eq('status', 'active').single();
+      trip = data;
+
+    } else if (role === 'parent') {
+      const { data: students } = await supabase
+        .from('students').select('id').eq('parent_id', id);
+      if (!students?.length) return res.json(null);
+
+      const studentIds = students.map(s => s.id);
+      const { data: tripStudents } = await supabase
+        .from('trip_students').select('trip_id').in('student_id', studentIds);
+      if (!tripStudents?.length) return res.json(null);
+
+      const tripIds = [...new Set(tripStudents.map(ts => ts.trip_id))];
+      const { data } = await supabase
+        .from('trips').select('*')
+        .in('id', tripIds).eq('status', 'active').single();
+      trip = data;
+    }
+
+    if (!trip) return res.json(null);
+
+    const { data: students } = await supabase
+      .from('trip_students')
+      .select('*, students(name, school, grade)')
+      .eq('trip_id', trip.id);
+
+    res.json({ ...trip, students: students || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  if (!trip) return res.json(null);
-  const students = db.prepare(`
-    SELECT ts.*, s.name, s.school, s.grade
-    FROM trip_students ts
-    JOIN students s ON ts.student_id = s.id
-    WHERE ts.trip_id = ?
-  `).all(trip.id);
-  res.json({ ...trip, students });
 });
 
-// Start a trip (driver)
-router.post('/start', auth, (req, res) => {
-  if (req.user.role !== 'driver') return res.status(403).json({ error: 'Forbidden' });
-  const driver = db.prepare('SELECT id FROM drivers WHERE user_id = ?').get(req.user.id);
-  if (!driver) return res.status(404).json({ error: 'Driver not found' });
+// ─────────────────────────────
+// ▶️ Start trip
+// ─────────────────────────────
+router.post('/start', auth, async (req, res) => {
+  if (req.user.role !== 'driver')
+    return res.status(403).json({ error: 'Forbidden' });
 
-  const existing = db.prepare(`SELECT id FROM trips WHERE driver_id = ? AND status = 'in_progress'`).get(driver.id);
-  if (existing) return res.status(409).json({ error: 'Trip already in progress' });
+  try {
+    const { data: driver } = await supabase
+      .from('drivers').select('id').eq('user_id', req.user.id).single();
+    if (!driver) return res.status(404).json({ error: 'Driver not found' });
 
-  const trip = db.prepare(`INSERT INTO trips (driver_id, route, status, started_at) VALUES (?, ?, 'in_progress', datetime('now'))`).run(driver.id, req.body.route || 'Morning Route');
-  db.prepare(`UPDATE drivers SET status = 'on_trip' WHERE id = ?`).run(driver.id);
+    const { data: existing } = await supabase
+      .from('trips').select('id')
+      .eq('driver_id', driver.id).eq('status', 'active').single();
+    if (existing) return res.status(409).json({ error: 'Trip already in progress' });
 
-  // Assign students on this driver's route
-  const students = db.prepare(`SELECT id FROM students WHERE van_id = ?`).all(driver.id);
-  const ins = db.prepare(`INSERT INTO trip_students (trip_id, student_id) VALUES (?, ?)`);
-  students.forEach(s => ins.run(trip.lastInsertRowid, s.id));
+    const { data: trip } = await supabase
+      .from('trips')
+      .insert({ driver_id: driver.id, status: 'active', started_at: new Date().toISOString() })
+      .select().single();
 
-  res.json({ id: trip.lastInsertRowid, status: 'in_progress' });
+    await supabase.from('drivers')
+      .update({ is_online: true }).eq('id', driver.id);
+
+    res.json({ id: trip.id, status: 'active' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Complete trip (driver)
-router.post('/:id/complete', auth, (req, res) => {
-  if (req.user.role !== 'driver') return res.status(403).json({ error: 'Forbidden' });
-  db.prepare(`UPDATE trips SET status = 'completed', completed_at = datetime('now') WHERE id = ?`).run(req.params.id);
-  const driver = db.prepare('SELECT id FROM drivers WHERE user_id = ?').get(req.user.id);
-  db.prepare(`UPDATE drivers SET status = 'online' WHERE id = ?`).run(driver.id);
-  res.json({ success: true });
+// ─────────────────────────────
+// ✅ Complete trip
+// ─────────────────────────────
+router.post('/:id/complete', auth, async (req, res) => {
+  if (req.user.role !== 'driver')
+    return res.status(403).json({ error: 'Forbidden' });
+
+  try {
+    await supabase.from('trips')
+      .update({ status: 'completed', ended_at: new Date().toISOString() })
+      .eq('id', req.params.id);
+
+    const { data: driver } = await supabase
+      .from('drivers').select('id').eq('user_id', req.user.id).single();
+
+    await supabase.from('drivers')
+      .update({ is_online: false }).eq('id', driver.id);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Check in student
-router.post('/:id/checkin/:studentId', auth, (req, res) => {
-  db.prepare(`UPDATE trip_students SET checked_in = 1, checked_in_at = datetime('now') WHERE trip_id = ? AND student_id = ?`).run(req.params.id, req.params.studentId);
-  res.json({ success: true });
+// ─────────────────────────────
+// 📍 Check-in
+// ─────────────────────────────
+router.post('/:id/checkin/:studentId', auth, async (req, res) => {
+  try {
+    await supabase.from('trip_students')
+      .update({ checked_in: true, checkin_at: new Date().toISOString() })
+      .eq('trip_id', req.params.id)
+      .eq('student_id', req.params.studentId);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Check out student
-router.post('/:id/checkout/:studentId', auth, (req, res) => {
-  db.prepare(`UPDATE trip_students SET checked_out = 1, checked_out_at = datetime('now') WHERE trip_id = ? AND student_id = ?`).run(req.params.id, req.params.studentId);
-  res.json({ success: true });
+// ─────────────────────────────
+// 📍 Check-out
+// ─────────────────────────────
+router.post('/:id/checkout/:studentId', auth, async (req, res) => {
+  try {
+    await supabase.from('trip_students')
+      .update({ checked_out: true, checkout_at: new Date().toISOString() })
+      .eq('trip_id', req.params.id)
+      .eq('student_id', req.params.studentId);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
