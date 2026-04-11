@@ -138,23 +138,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install frontend dependencies
-        run: npm install
-        working-directory: frontend
-
-      - name: Build frontend
-        run: npm run build
-        working-directory: frontend
-        env:
-          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
-          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
-
       - run: npm install -g vercel
 
       - name: Deploy to Vercel
-        run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
         working-directory: frontend
+        run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        
         
 
   # ── 6. Render Deploy ───────────────────
