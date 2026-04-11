@@ -11,16 +11,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnon);
 // ─── Auth helpers ───────────────────────────────────────────
 
 /** Sign in with Google (opens OAuth popup/redirect) */
-export async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
+export const signInWithGoogle = async () => {
+  return supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/dashboard`,
-      queryParams: { access_type: 'offline', prompt: 'consent' }
+      redirectTo: window.location.origin + '/profile'
     }
   });
-  if (error) throw error;
-}
+};
 
 /** Sign out */
 export async function signOut() {
