@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #FFFBF0;
+  color: #1C1917;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { text-decoration: none; color: inherit; }
+button { font-family: 'DM Sans', sans-serif; cursor: pointer; }
+input, select, textarea { font-family: 'DM Sans', sans-serif; outline: none; }
+input::placeholder { color: #A8A29E; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #FEF3C7; }
+::-webkit-scrollbar-thumb { background: #F59E0B; border-radius: 3px; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+@keyframes slideIn { from { width: 0 } to { width: 100% } }
+
+/* Modern input focus glow */
+input:focus, select:focus, textarea:focus {
+  border-color: #F59E0B !important;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.15) !important;
+}
+
+/* Button hover polish */
+button:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+/* Smooth transitions everywhere */
+* { transition: box-shadow 0.2s, border-color 0.2s; }
+
+/* Page fade-in */
+#root > * {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Custom scrollbar polish */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.4); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #F59E0B; }
