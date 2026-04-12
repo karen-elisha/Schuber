@@ -41,3 +41,12 @@ temp/
 
 # OS generated
 Thumbs.db
+node_modules/
+.env
+build/
+.vercel/
+*.log
+
+*.db
+*.db-shm
+*.db-wal
