@@ -283,7 +283,6 @@ function ParentStudents() {
     supabase.from('drivers').select('id, vehicle_no, vehicle_model, rating, is_online, verified, profiles(full_name)').then(({ data }) => {
       if (data) setDrivers(data.map(d => ({ id: d.id, name: d.profiles?.full_name, vehicle_no: d.vehicle_no, verified: d.verified, vehicle_model: d.vehicle_model, rating: d.rating })));
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   const addStudent = async (e) => {

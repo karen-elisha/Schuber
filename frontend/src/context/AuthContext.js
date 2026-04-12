@@ -134,8 +134,7 @@ export function AuthProvider({ children }) {
     // Safety timeout
     const t = setTimeout(() => setLoading(false), 6000);
     return () => { subscription.unsubscribe(); clearTimeout(t); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // intentionally empty — bootstrap is stable via useCallback pattern
 
   // ── login() ────────────────────────────────────────────────────────────────
   async function login(emailRaw, password) {
