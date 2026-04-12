@@ -68,17 +68,36 @@ export default function RegisterPage() {
     setError(''); setLoading(true);
     try {
       const user = await register(form.email, form.password, form.name, form.role, form.phone);
+
       if (!user) {
-        setSuccess('Account created! Check your email to confirm, then sign in.');
+        // Email confirmation is ON — user created but no session yet
+        setSuccess('✅ Account created! Check your email to confirm, then sign in.');
         return;
       }
-      const role = user?.user_metadata?.role || form.role;
 
-      if (role === 'driver') {
-        navigate('/driver', { replace: true });   // ✅ go to driver dashboard
-      }
+      // Successful registration with session — navigate by chosen role
+      const role = user?.user_metadata?.role || form.role;
+      if (role === 'driver') navigate('/driver', { replace: true });
+      else if (role === 'admin') navigate('/admin', { replace: true });
+      else navigate('/parent', { replace: true });
+
     } catch (err) {
-      setError(err.message || 'Registration failed. Try again.');
+      const msg = err.message || '';
+
+      if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('email rate')) {
+        setError('');
+        setSuccess(
+          '⏳ Supabase email rate limit reached (3 signup emails/hour on free tier). ' +
+          'Your account may still have been created — try signing in below. ' +
+          'Or the admin can disable email confirmation in Supabase → Authentication → Settings.'
+        );
+      } else if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('user already')) {
+        setError('This email is already registered. Please sign in instead.');
+      } else if (msg.toLowerCase().includes('password')) {
+        setError('Password must be at least 6 characters.');
+      } else {
+        setError(msg || 'Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -203,7 +222,7 @@ export default function RegisterPage() {
               </div>
             </div>
             {error && <div style={s.error}>⚠️ {error}</div>}
-            {success && <div style={s.successBox}>✅ {success}</div>}
+            {success && <div style={success.startsWith('⏳') ? s.warnBox : s.successBox}>{success}</div>}
             <button type="submit" disabled={loading} className="submit-reg"
               style={{ ...s.submit, opacity: loading ? 0.8 : 1 }}>
               {loading ? <span style={s.spinner} /> : null}
@@ -314,6 +333,7 @@ const s = {
   input: { background: '#FFFFFF', border: '1.5px solid #E5E7EB', borderRadius: 10, padding: '0.65rem 0.875rem', color: '#1C1917', fontSize: '0.9rem', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif", boxSizing: 'border-box', width: '100%' },
   error: { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '0.7rem 1rem', borderRadius: 8, fontSize: '0.84rem' },
   successBox: { background: '#DCFCE7', border: '1px solid #BBF7D0', color: '#065F46', padding: '0.7rem 1rem', borderRadius: 8, fontSize: '0.84rem' },
+  warnBox: { background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', padding: '0.7rem 1rem', borderRadius: 8, fontSize: '0.84rem', lineHeight: 1.5 },
   submit: { background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)', color: '#fff', border: 'none', padding: '0.875rem', borderRadius: 12, fontSize: '0.95rem', fontWeight: 700, marginTop: '0.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontFamily: "'DM Sans', sans-serif", boxShadow: '0 4px 14px rgba(245,158,11,0.35)', transition: 'transform 0.2s, box-shadow 0.2s' },
   spinner: { width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' },
   driverNote: { background: '#FFF8E7', border: '1px solid #FDE68A', borderRadius: 10, padding: '0.65rem 0.875rem', fontSize: '0.8rem', color: '#92400E', marginBottom: '0.75rem' },
