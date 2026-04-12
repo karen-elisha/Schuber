@@ -137,47 +137,37 @@ export function AuthProvider({ children }) {
   }, []); // intentionally empty — bootstrap is stable via useCallback pattern
 
   // ── login() ────────────────────────────────────────────────────────────────
+  // ── login() — only used for demo accounts ─────────────────────────────────
+  // Real users sign in via Google (signInWithGoogle) which is handled
+  // automatically by Supabase onAuthStateChange.
   async function login(emailRaw, password) {
     const email = emailRaw?.trim().toLowerCase();
     loginSetRef.current = false;
     localStorage.removeItem('schuber-demo-session');
 
-    // ── 1. Try real Supabase auth ──────────────────────────────────────────
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (!error && data?.user) {
-        const meta   = data.user.user_metadata ?? {};
-        const dbProf = await fetchProfileRole(data.user.id, email);
-        const role   = bestRole(dbProf?.role, meta.role, email);
-
-        const fullProfile = {
-          id:         data.user.id,
-          email,
-          role,
-          full_name:  dbProf?.full_name ?? meta.full_name ?? email,
-          phone:      dbProf?.phone     ?? meta.phone     ?? null,
-          avatar_url: dbProf?.avatar_url ?? meta.avatar_url ?? null,
-        };
-
-        console.log('[Auth] ✅ login:', email, '→ role:', role);
-
-        loginSetRef.current = true;       // block bootstrap from overwriting
-        setUser(data.user);
-        setProfile(fullProfile);
-        setIsDemoUser(false);
-        setLoading(false);
-        return { ...data.user, role };
-      }
-      // If Supabase returned an error, fall through to demo
-      console.warn('[Auth] Supabase login error:', error?.message);
-    } catch (e) {
-      console.warn('[Auth] Supabase unreachable:', e.message);
-    }
-
-    // ── 2. Demo account fallback ───────────────────────────────────────────
+    // ── Demo account fast-path ─────────────────────────────────────────────
     const demo = DEMO_ACCOUNTS[email];
     if (demo && demo.password === password) {
       console.log('[Auth] 🎭 demo login:', email, '→ role:', demo.role);
+
+      // Also try real Supabase auth for demo accounts (so DB queries work)
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (!error && data?.user) {
+          const meta   = data.user.user_metadata ?? {};
+          const dbProf = await fetchProfileRole(data.user.id, email);
+          const role   = bestRole(dbProf?.role, meta.role, email);
+          const fullProfile = { id: data.user.id, email, role,
+            full_name: dbProf?.full_name ?? meta.full_name ?? demo.full_name,
+            phone:     dbProf?.phone     ?? meta.phone     ?? demo.phone,
+          };
+          loginSetRef.current = true;
+          setUser(data.user); setProfile(fullProfile); setIsDemoUser(false); setLoading(false);
+          return { ...data.user, role };
+        }
+      } catch { /* fall through to local demo */ }
+
+      // Local demo fallback (no internet / Supabase down)
       const demoProfile = { ...demo };
       localStorage.setItem('schuber-demo-session', JSON.stringify(demoProfile));
       loginSetRef.current = true;
@@ -188,44 +178,7 @@ export function AuthProvider({ children }) {
       return { ...demo, role: demo.role };
     }
 
-    throw new Error('Invalid email or password.');
-  }
-
-  // ── register() ─────────────────────────────────────────────────────────────
-  // Calls the backend which uses admin.createUser — email auto-confirmed,
-  // no confirmation email sent, no rate limits, works even when
-  // "Enable email signups" appears disabled in Supabase dashboard.
-  async function register(email, password, fullName, role = 'parent', phone = '') {
-    const API = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
-
-    const res = await fetch(`${API}/auth/register`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ email, password, full_name: fullName, role, phone }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed.');
-
-    // Backend returns a token — set Supabase session so auth state fires
-    if (data.token) {
-      const { data: sessionData } = await supabase.auth.setSession({
-        access_token:  data.token,
-        refresh_token: data.token, // backend only returns access_token; refresh handled by Supabase
-      });
-
-      const supaUser = sessionData?.user || data.user;
-      const prof = { id: supaUser?.id || data.user.id, role, full_name: fullName, email, phone };
-      loginSetRef.current = true;
-      setUser(supaUser || data.user);
-      setProfile({ ...prof, role });
-      setIsDemoUser(false);
-      setLoading(false);
-      return { ...(supaUser || data.user), role };
-    }
-
-    // No token (unlikely) — return user so caller can show "please sign in"
-    return null;
+    throw new Error('Invalid demo credentials.');
   }
 
   // ── logout() ───────────────────────────────────────────────────────────────
@@ -263,7 +216,7 @@ export function AuthProvider({ children }) {
       user, profile,
       role: profile?.role ?? null,
       loading, isDemoUser,
-      login, register,
+      login,
       logout, signOut: logout,
       signInWithGoogle,
       getAuthHeader, refreshProfile,
