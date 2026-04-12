@@ -1,11 +1,12 @@
 /**
- * AuthContext — Simple, bulletproof auth with role-based routing
+ * AuthContext — Role-based auth with strict security rules:
  *
- * Role resolution order (most → least reliable):
- *   1. profiles table in DB        (most reliable, set by seed/admin)
- *   2. user_metadata.role          (set in Supabase Auth on signup)
- *   3. KNOWN_ROLES email map       (hardcoded for demo accounts)
- *   4. 'parent'                    (safe default)
+ * 1. ADMIN_EMAIL is the ONLY account that can have admin role.
+ *    No one else can be admin, even if they pick admin on login page.
+ * 2. If a user already has a role in DB (parent/driver), they CANNOT
+ *    switch to a different role—their DB role always wins.
+ * 3. Role resolution priority:
+ *    pendingRole (login picker) → resolvedRoleRef (session cache) → DB → metadata
  *
  * Key design:  login() sets profile immediately in React state.
  *              A ref guards against bootstrap() overwriting it.
@@ -16,18 +17,22 @@ import { supabase, signInWithGoogle, signOut } from '../supabase';
 
 const AuthContext = createContext(null);
 
-// ── Demo accounts (local fallback when Supabase auth is unavailable) ──────────
+// ── The ONE admin email — only this account can have admin role ───────────────
+const ADMIN_EMAIL = 'karenelisha0204@gmail.com';
+
+// ── Demo accounts (testing only) ──────────────────────────────────────────────
 const DEMO_ACCOUNTS = {
   'priya@example.com':  { password:'parent123', role:'parent', full_name:'Priya Sharma',   id:'demo-parent-001', email:'priya@example.com',  phone:'+91 98765 43210' },
   'suresh@example.com': { password:'driver123', role:'driver', full_name:'Suresh Kumar',   id:'demo-driver-001', email:'suresh@example.com', phone:'+91 98765 99999' },
   'admin@schuber.com':  { password:'admin123',  role:'admin',  full_name:'Schuber Admin',  id:'demo-admin-001',  email:'admin@schuber.com',  phone:'+91 98765 00000' },
 };
 
-// Guaranteed role for known e-mails — bypasses all DB / metadata issues
+// Guaranteed role for known e-mails
 const KNOWN_ROLES = {
-  'priya@example.com':  'parent',
-  'suresh@example.com': 'driver',
-  'admin@schuber.com':  'admin',
+  'priya@example.com':       'parent',
+  'suresh@example.com':      'driver',
+  'admin@schuber.com':       'admin',
+  [ADMIN_EMAIL.toLowerCase()]: 'admin', // real admin always gets admin
 };
 
 async function fetchProfileRole(userId, email) {
@@ -96,50 +101,76 @@ export function AuthProvider({ children }) {
       const email       = session.user.email ?? '';
       const dbProf      = await fetchProfileRole(session.user.id, email);
 
-      // Resolve role — priority:
-      //  1. pendingRole (role picker before Google OAuth)
-      //  2. resolvedRoleRef (last role this session — survives double auth-state-change fires)
-      //  3. DB profile role
-      //  4. user_metadata / known email map
       const pendingRole = localStorage.getItem('schuber-pending-role');
-      const role =
-        pendingRole
-        || resolvedRoleRef.current          // ← survives second bootstrap() call
-        || dbProf?.role
-        || bestRole(null, meta.role, email);
+      localStorage.removeItem('schuber-pending-role');
 
-      if (!role) console.warn('[Auth] ⚠️  No role resolved for', email);
+      // ── RULE 1: Admin-only email enforcement ──────────────────────────────
+      // karenelisha0204@gmail.com is ALWAYS admin.
+      // Any other account that somehow gets admin role is forced to parent.
+      const isAdminEmail = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+      // ── RULE 2: Role conflict — if user already has a DB role, respect it ─
+      // They cannot switch roles by picking a different one on the login page.
+      const existingRole = dbProf?.role;
+      let resolvedRole;
+
+      if (isAdminEmail) {
+        // Real admin account — always admin, no exceptions
+        resolvedRole = 'admin';
+      } else if (existingRole && existingRole !== 'admin') {
+        // Existing parent/driver — their DB role wins, ignore pendingRole
+        if (pendingRole && pendingRole !== existingRole) {
+          // They tried to sign in as a different role — sign them out and block
+          console.warn(`[Auth] 🚫 Role conflict: account is '${existingRole}', tried '${pendingRole}'`);
+          localStorage.setItem('schuber-role-conflict', `This account is registered as a ${existingRole}. Please sign in as ${existingRole}.`);
+          await signOut().catch(() => {});
+          setUser(null); setProfile(null); setLoading(false);
+          return;
+        }
+        resolvedRole = existingRole;
+      } else {
+        // New user — use pendingRole from the role picker
+        resolvedRole =
+          pendingRole
+          || resolvedRoleRef.current
+          || bestRole(null, meta.role, email);
+
+        // Block anyone (other than admin email) from getting admin role
+        if (resolvedRole === 'admin' && !isAdminEmail) {
+          console.warn('[Auth] 🚫 Blocked non-admin email from getting admin role:', email);
+          resolvedRole = null;
+          localStorage.setItem('schuber-role-conflict', 'Admin access is restricted.');
+          await signOut().catch(() => {});
+          setUser(null); setProfile(null); setLoading(false);
+          return;
+        }
+      }
+
+      if (!resolvedRole) console.warn('[Auth] ⚠️  No role resolved for', email);
 
       // Remember this role for any subsequent bootstrap() calls this session
-      if (role) resolvedRoleRef.current = role;
+      if (resolvedRole) resolvedRoleRef.current = resolvedRole;
 
-      // Persist role to profiles table when:
-      //  - user just picked a role (pendingRole set), OR
-      //  - profile row has no role yet
-      if (pendingRole || !dbProf?.role) {
-        localStorage.removeItem('schuber-pending-role');
-        // Never downgrade driver/admin to parent accidentally
-        const safeRole = (dbProf?.role && dbProf.role !== 'parent') ? dbProf.role : (role || 'parent');
+      // Persist profile + role to DB when new or roleless
+      if (pendingRole || !existingRole) {
         await supabase.from('profiles').upsert({
           id:        session.user.id,
           email,
-          role:      safeRole,
+          role:      resolvedRole || 'parent',
           full_name: dbProf?.full_name || meta.full_name || meta.name || email,
           phone:     dbProf?.phone     || meta.phone     || null,
         }, { onConflict: 'id' }).catch(() => {});
 
         // New driver → flag for verification form
-        if (role === 'driver' && !dbProf?.role) {
+        if (resolvedRole === 'driver' && !existingRole) {
           localStorage.setItem('schuber-driver-setup', '1');
         }
-      } else {
-        localStorage.removeItem('schuber-pending-role');
       }
 
       setProfile({
         id:         session.user.id,
         email,
-        role,
+        role:       resolvedRole,
         full_name:  dbProf?.full_name ?? meta.full_name ?? email,
         phone:      dbProf?.phone     ?? meta.phone     ?? null,
         avatar_url: dbProf?.avatar_url ?? meta.avatar_url ?? null,

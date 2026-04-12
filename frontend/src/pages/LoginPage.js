@@ -4,47 +4,49 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { signInWithGoogle } from '../supabase';
 
+
+// Admin signs in via Google automatically — no tab shown
 const ROLES = [
   {
-    id:       'parent',
-    icon:     '👨‍👩‍👧',
-    label:    'Parent',
-    color:    '#059669',
-    bg:       '#DCFCE7',
-    border:   '#6EE7B7',
-    desc:     'Track your child\'s commute',
-    demo:     { email:'priya@example.com', password:'parent123' },
+    id:     'parent',
+    icon:   '👨‍👩‍👧',
+    label:  'Parent',
+    color:  '#059669',
+    bg:     '#DCFCE7',
+    border: '#6EE7B7',
+    desc:   "Track your child's commute",
+    demo:   { email:'priya@example.com', password:'parent123' },
   },
   {
-    id:       'driver',
-    icon:     '🚌',
-    label:    'Driver',
-    color:    '#2563EB',
-    bg:       '#EFF6FF',
-    border:   '#93C5FD',
-    desc:     'Manage trips & students',
-    demo:     { email:'suresh@example.com', password:'driver123' },
-  },
-  {
-    id:       'admin',
-    icon:     '🛡️',
-    label:    'Admin',
-    color:    '#7C3AED',
-    bg:       '#EDE9FE',
-    border:   '#C4B5FD',
-    desc:     'Fleet & operations control',
-    demo:     { email:'admin@schuber.com', password:'admin123' },
+    id:     'driver',
+    icon:   '🚌',
+    label:  'Driver',
+    color:  '#2563EB',
+    bg:     '#EFF6FF',
+    border: '#93C5FD',
+    desc:   'Manage trips & students',
+    demo:   { email:'suresh@example.com', password:'driver123' },
   },
 ];
+
 
 export default function LoginPage() {
   const { login }   = useAuth();
   const navigate    = useNavigate();
 
-  const [selectedRole, setSelectedRole] = useState('parent');
-  const [demoLoading, setDemoLoading]   = useState(false);
+  const [selectedRole,  setSelectedRole]  = useState('parent');
+  const [demoLoading,   setDemoLoading]   = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [error, setError]               = useState('');
+  const [error,         setError]         = useState('');
+
+  // Pick up role-conflict error set by AuthContext bootstrap
+  useEffect(() => {
+    const conflict = localStorage.getItem('schuber-role-conflict');
+    if (conflict) {
+      setError(conflict);
+      localStorage.removeItem('schuber-role-conflict');
+    }
+  }, []);
 
   const role = ROLES.find(r => r.id === selectedRole);
 
