@@ -13,14 +13,21 @@ export default function DriverVerificationPage() {
   const dlRef = useRef();
   const rcRef = useRef();
   const picRef = useRef();
-
   useEffect(() => {
-    // Safety: If you are not a driver, you shouldn't be here
-    if (role && role !== 'driver') {
-      console.log('[Verification] 🚫 Not a driver, redirecting to:', role);
+    if (!role) return;
+
+    // ❌ Not driver → redirect
+    if (role !== 'driver') {
       navigate(`/${role}`, { replace: true });
+      return;
     }
-  }, [role, navigate]);
+
+    // ✅ Already verified → skip page
+    if (user?.driver_profile_exists) {
+      navigate('/driver', { replace: true });
+    }
+
+  }, [role, user, navigate]);
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);

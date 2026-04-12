@@ -35,27 +35,37 @@ const KNOWN_ROLES = {
   [ADMIN_EMAIL.toLowerCase()]: 'admin', // real admin always gets admin
 };
 
-async function fetchProfileRole(userId, email) {
+const fetchProfileRole = async (userId) => {
   try {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role, full_name, phone, avatar_url')
+      .select('role, full_name')
       .eq('id', userId)
       .single();
 
-    if (profile?.role === 'driver') {
+    if (!profile) return null;
+
+    // 🔥 DRIVER CHECK
+    if (profile.role === 'driver') {
       const { data: driver } = await supabase
         .from('drivers')
         .select('id, verified')
         .eq('user_id', userId)
         .maybeSingle();
-      return { ...profile, driver_profile_exists: !!driver, is_verified: driver?.verified ?? false };
+
+      return {
+        ...profile,
+        driver_profile_exists: !!driver, // ✅ KEY FIX
+        is_verified: driver?.verified ?? false
+      };
     }
 
-    if (profile?.role) return profile;
-  } catch (_) { }
-  return null;
-}
+    return profile;
+  } catch (err) {
+    console.error('Error fetching profile:', err);
+    return null;
+  }
+};
 
 function bestRole(dbRole, metaRole, email) {
   if (dbRole) return dbRole;
