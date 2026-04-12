@@ -273,3 +273,4 @@ SQLite via `better-sqlite3`. The `schuber.db` file is auto-created and seeded on
 ---
 
 ## 📝 License
+MIT
