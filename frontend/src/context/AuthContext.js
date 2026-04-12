@@ -97,7 +97,7 @@ export function AuthProvider({ children }) {
       const pendingRole = localStorage.getItem('schuber-pending-role');
       const role        = dbProf?.role || pendingRole || bestRole(null, meta.role, email);
 
-      // If pending role — persist it to profiles table + create driver row if needed
+      // If pending role — persist it to profiles table
       if (pendingRole && !dbProf?.role) {
         localStorage.removeItem('schuber-pending-role');
         await supabase.from('profiles').upsert({
@@ -108,10 +108,10 @@ export function AuthProvider({ children }) {
           phone:     meta.phone || null,
         }, { onConflict: 'id' }).catch(() => {});
 
+        // New driver → flag for verification form (don't create drivers row yet,
+        // the DriverVerificationPage will do it with full details)
         if (role === 'driver') {
-          await supabase.from('drivers').insert({
-            user_id: session.user.id, verified: false, is_online: false, rating: 0, capacity: 12,
-          }).catch(() => {});
+          localStorage.setItem('schuber-driver-setup', '1');
         }
       } else {
         localStorage.removeItem('schuber-pending-role');

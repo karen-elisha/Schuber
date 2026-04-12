@@ -51,7 +51,11 @@ function AppRoutes() {
     <Routes>
       {/* HOME */}
       <Route path="/" element={
-        user && profile?.role ? <Navigate to={`/${profile.role}`} replace /> : <LandingPage />
+        user && profile?.role
+          ? (profile.role === 'driver' && localStorage.getItem('schuber-driver-setup')
+              ? <Navigate to="/driver-verification" replace />
+              : <Navigate to={`/${profile.role}`} replace />)
+          : <LandingPage />
       } />
 
       {/* AUTH */}
