@@ -358,11 +358,11 @@ function ReviewRow({ label, value }) {
 
 /* ── Styles ── */
 const s = {
-  page:         { minHeight:'100vh', background:'#FFFBF0', fontFamily:"'DM Sans',sans-serif", display:'flex', flexDirection:'column', alignItems:'center', padding:'2rem 1rem' },
+  page:         { minHeight:'100vh', background:'#FFFBF0', fontFamily:"'Plus Jakarta Sans',sans-serif", display:'flex', flexDirection:'column', alignItems:'center', padding:'2rem 1rem' },
   container:    { width:'100%', maxWidth:720, animation:'fadeUp 0.4s ease' },
   header:       { textAlign:'center', marginBottom:'2rem' },
-  headerLogo:   { fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.4rem', color:'#1C1917', marginBottom:'0.75rem' },
-  headerTitle:  { fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.75rem', color:'#1C1917', margin:'0 0 0.35rem' },
+  headerLogo:   { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.4rem', color:'#1C1917', marginBottom:'0.75rem' },
+  headerTitle:  { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.75rem', color:'#1C1917', margin:'0 0 0.35rem' },
   headerSub:    { color:'#78716C', fontSize:'0.92rem', margin:0 },
   // Steps
   steps:        { display:'flex', alignItems:'flex-start', justifyContent:'center', gap:0, marginBottom:'2rem', position:'relative' },
@@ -376,24 +376,24 @@ const s = {
   // Form
   formCard:     { background:'#fff', border:'1.5px solid #FDE68A', borderRadius:20, boxShadow:'0 4px 24px rgba(245,158,11,0.08)', overflow:'hidden' },
   formBody:     { padding:'2rem', animation:'fadeUp 0.3s ease' },
-  stepTitle:    { fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.2rem', color:'#1C1917', margin:'0 0 1.25rem' },
+  stepTitle:    { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.2rem', color:'#1C1917', margin:'0 0 1.25rem' },
   stepHint:     { color:'#78716C', fontSize:'0.82rem', margin:'-0.75rem 0 1.25rem' },
   grid2:        { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', marginBottom:'1rem' },
-  input:        { padding:'0.65rem 0.875rem', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:'0.9rem', color:'#1C1917', background:'#fff', width:'100%', boxSizing:'border-box', fontFamily:"'DM Sans',sans-serif", transition:'border-color 0.2s, box-shadow 0.2s' },
-  select:       { padding:'0.65rem 0.875rem', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:'0.9rem', color:'#1C1917', background:'#fff', width:'100%', fontFamily:"'DM Sans',sans-serif", transition:'border-color 0.2s' },
+  input:        { padding:'0.65rem 0.875rem', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:'0.9rem', color:'#1C1917', background:'#fff', width:'100%', boxSizing:'border-box', fontFamily:"'Plus Jakarta Sans',sans-serif", transition:'border-color 0.2s, box-shadow 0.2s' },
+  select:       { padding:'0.65rem 0.875rem', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:'0.9rem', color:'#1C1917', background:'#fff', width:'100%', fontFamily:"'Plus Jakarta Sans',sans-serif", transition:'border-color 0.2s' },
   uploadGrid:   { display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem' },
   reviewGrid:   { background:'#FFFBF0', border:'1px solid #FDE68A', borderRadius:12, padding:'1rem 1.25rem', marginBottom:'1.25rem' },
   reviewNote:   { background:'#FEF3C7', border:'1px solid #FDE68A', borderRadius:10, padding:'0.75rem 1rem', fontSize:'0.82rem', color:'#92400E', lineHeight:1.6 },
   errBox:       { background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', borderRadius:10, padding:'0.75rem 1rem', fontSize:'0.85rem', marginTop:'1rem' },
   // Nav
   navRow:       { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1.25rem 2rem', borderTop:'1px solid #FDE68A', background:'#FFFBF0' },
-  backBtn:      { padding:'0.7rem 1.5rem', background:'#fff', border:'1.5px solid #FDE68A', borderRadius:10, fontWeight:700, color:'#92400E', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", fontSize:'0.9rem' },
-  nextBtn:      { padding:'0.7rem 1.75rem', background:'#F59E0B', border:'none', borderRadius:10, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", fontSize:'0.9rem', boxShadow:'0 4px 12px rgba(245,158,11,0.35)', marginLeft:'auto' },
-  submitBtn:    { padding:'0.8rem 2rem', background:'linear-gradient(135deg,#F59E0B,#D97706)', border:'none', borderRadius:10, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", fontSize:'0.95rem', boxShadow:'0 4px 14px rgba(245,158,11,0.35)', display:'flex', alignItems:'center', gap:'0.5rem', marginLeft:'auto' },
+  backBtn:      { padding:'0.7rem 1.5rem', background:'#fff', border:'1.5px solid #FDE68A', borderRadius:10, fontWeight:700, color:'#92400E', cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:'0.9rem' },
+  nextBtn:      { padding:'0.7rem 1.75rem', background:'#F59E0B', border:'none', borderRadius:10, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:'0.9rem', boxShadow:'0 4px 12px rgba(245,158,11,0.35)', marginLeft:'auto' },
+  submitBtn:    { padding:'0.8rem 2rem', background:'linear-gradient(135deg,#F59E0B,#D97706)', border:'none', borderRadius:10, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:'0.95rem', boxShadow:'0 4px 14px rgba(245,158,11,0.35)', display:'flex', alignItems:'center', gap:'0.5rem', marginLeft:'auto' },
   // Success
   successCard:  { background:'#fff', border:'1.5px solid #FDE68A', borderRadius:20, padding:'3rem 2.5rem', textAlign:'center', maxWidth:420, boxShadow:'0 8px 40px rgba(245,158,11,0.12)' },
   successEmoji: { fontSize:'3.5rem', marginBottom:'1rem' },
-  successTitle: { fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.5rem', color:'#1C1917', margin:'0 0 0.5rem' },
+  successTitle: { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.5rem', color:'#1C1917', margin:'0 0 0.5rem' },
   successSub:   { color:'#78716C', fontSize:'0.9rem', margin:'0 0 1.5rem', lineHeight:1.6 },
   progressBar:  { height:5, background:'#FDE68A', borderRadius:99, overflow:'hidden' },
   progressFill: { height:'100%', background:'#F59E0B', borderRadius:99, animation:'grow 2.5s linear forwards' },

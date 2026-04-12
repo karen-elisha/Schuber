@@ -25,7 +25,7 @@ const s = {
   iconWrap: { width: 44, height: 44, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', flexShrink: 0 },
   body: { flex: 1 },
   label: { color: '#78716C', fontSize: '0.75rem', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 },
-  value: { fontFamily: "'Syne', sans-serif", fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, color: '#1C1917' },
+  value: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, color: '#1C1917' },
   sub: { color: '#A8A29E', fontSize: '0.73rem', marginTop: '0.25rem' },
   trend: { fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 },
 };

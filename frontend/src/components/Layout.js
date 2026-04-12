@@ -103,10 +103,10 @@ export default function Layout({ children, navItems, title }) {
 }
 
 const s = {
-  shell: { display: 'flex', minHeight: '100vh', background: '#FFFBF0', fontFamily: "'DM Sans', sans-serif" },
+  shell: { display: 'flex', minHeight: '100vh', background: '#FFFBF0', fontFamily: "'Plus Jakarta Sans', sans-serif" },
   sidebar: { background: '#FFFFFF', borderRight: '2px solid #FDE68A', display: 'flex', flexDirection: 'column', transition: 'width 0.25s ease', flexShrink: 0, position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' },
   sideTop: { padding: '1.25rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #FEF3C7', flexShrink: 0 },
-  logoText: { fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '1.1rem', color: '#1C1917' },
+  logoText: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: '1.1rem', color: '#1C1917' },
   collapseBtn: { background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', width: 26, height: 26, borderRadius: 6, cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   nav: { flex: 1, padding: '0.875rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', overflowY: 'auto' },
   navItem: { display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.6rem 0.75rem', borderRadius: 10, color: '#78716C', fontSize: '0.875rem', fontWeight: 500, transition: 'all 0.15s' },
@@ -123,14 +123,14 @@ const s = {
   profileEmail: { color: '#57534E', fontWeight: 500, marginBottom: '0.25rem', wordBreak: 'break-all' },
   profilePhone: { color: '#78716C', marginBottom: '0.25rem' },
   profileRole: { color: '#A8A29E', textTransform: 'capitalize', marginBottom: '0.25rem' },
-  logoutBtn: { background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', padding: '0.4rem 0.75rem', borderRadius: 7, fontSize: '0.78rem', cursor: 'pointer', textAlign: 'left', width: '100%', transition: 'background 0.15s', fontFamily: "'DM Sans', sans-serif" },
+  logoutBtn: { background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', padding: '0.4rem 0.75rem', borderRadius: 7, fontSize: '0.78rem', cursor: 'pointer', textAlign: 'left', width: '100%', transition: 'background 0.15s', fontFamily: "'Plus Jakarta Sans', sans-serif" },
   main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' },
   header: { padding: '1rem 2rem', borderBottom: '1px solid #FDE68A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFFFFF', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(245,158,11,0.08)' },
-  pageTitle: { fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: '1.2rem', color: '#1C1917', margin: 0 },
+  pageTitle: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: '1.2rem', color: '#1C1917', margin: 0 },
   headerRight: { display: 'flex', alignItems: 'center', gap: '0.75rem' },
   headerAvatar: { width: 34, height: 34, borderRadius: '50%', background: '#F59E0B', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.78rem', flexShrink: 0 },
   headerName: { fontSize: '0.85rem', fontWeight: 600, color: '#1C1917' },
   headerRole: { fontSize: '0.72rem', color: '#A8A29E', textTransform: 'capitalize' },
-  headerLogout: { background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', padding: '0.4rem 0.875rem', borderRadius: 8, fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" },
+  headerLogout: { background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', padding: '0.4rem 0.875rem', borderRadius: 8, fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif" },
   content: { flex: 1, padding: '1.75rem 2rem', overflowY: 'auto' },
 };

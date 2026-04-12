@@ -171,27 +171,27 @@ export default function RegisterPage() {
 /* ── Styles ── */
 const s = {
   // Layout
-  page:         { display:'flex', minHeight:'100vh', fontFamily:"'DM Sans',sans-serif", background:'#FFFBF0' },
+  page:         { display:'flex', minHeight:'100vh', fontFamily:"'Plus Jakarta Sans',sans-serif", background:'#FFFBF0' },
   left:         { flex:'1 1 520px', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'2.5rem 2rem', overflowY:'auto' },
   right:        { flex:'0 0 420px', background:'linear-gradient(160deg,#F59E0B 0%,#B45309 100%)', display:'flex', alignItems:'center', justifyContent:'center', overflowY:'auto' },
   rightInner:   { padding:'3rem 2.25rem', width:'100%' },
 
   // Left card
   card:         { width:'100%', maxWidth:480, animation:'fadeUp 0.4s ease', paddingTop:'0.5rem' },
-  logo:         { display:'block', fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.45rem', color:'#1C1917', textDecoration:'none', marginBottom:'1.5rem' },
-  heading:      { fontFamily:"'Syne',sans-serif", fontSize:'1.75rem', fontWeight:800, color:'#1C1917', margin:'0 0 0.35rem' },
+  logo:         { display:'block', fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.45rem', color:'#1C1917', textDecoration:'none', marginBottom:'1.5rem' },
+  heading:      { fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:'1.75rem', fontWeight:800, color:'#1C1917', margin:'0 0 0.35rem' },
   sub:          { color:'#78716C', fontSize:'0.92rem', margin:'0 0 1.25rem' },
 
   // Stats
   statsRow:     { display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'0.5rem', marginBottom:'1.25rem', background:'linear-gradient(135deg,#FEF3C7,#FFFBEB)', borderRadius:12, padding:'0.75rem', border:'1px solid #FDE68A' },
   stat:         { textAlign:'center' },
-  statVal:      { fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1rem', color:'#D97706' },
+  statVal:      { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1rem', color:'#D97706' },
   statLbl:      { fontSize:'0.62rem', color:'#78716C', fontWeight:600, marginTop:'0.1rem' },
 
   // Role picker
   roleLabel:    { fontSize:'0.72rem', color:'#57534E', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', margin:'0 0 0.6rem' },
   roleGrid:     { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem', marginBottom:'1rem' },
-  roleCard:     { position:'relative', padding:'1rem', background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:14, cursor:'pointer', textAlign:'left', transition:'all 0.2s', fontFamily:"'DM Sans',sans-serif", boxShadow:'0 1px 4px rgba(0,0,0,0.04)' },
+  roleCard:     { position:'relative', padding:'1rem', background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:14, cursor:'pointer', textAlign:'left', transition:'all 0.2s', fontFamily:"'Plus Jakarta Sans',sans-serif", boxShadow:'0 1px 4px rgba(0,0,0,0.04)' },
   roleCardActive:{ border:'2px solid #F59E0B', background:'#FFFBEB', boxShadow:'0 4px 16px rgba(245,158,11,0.18)' },
   roleIcon:     { fontSize:'1.75rem', marginBottom:'0.4rem' },
   roleTitle:    { fontWeight:800, fontSize:'0.95rem', color:'#1C1917', marginBottom:'0.2rem' },
@@ -208,7 +208,7 @@ const s = {
   errorBox:     { background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', padding:'0.7rem 1rem', borderRadius:10, fontSize:'0.85rem', marginBottom:'1rem' },
 
   // Google button
-  googleBtn:    { width:'100%', display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.9rem 1.25rem', background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:12, fontSize:'0.95rem', fontWeight:700, color:'#1C1917', cursor:'pointer', boxShadow:'0 2px 10px rgba(0,0,0,0.07)', transition:'all 0.2s', fontFamily:"'DM Sans',sans-serif", marginBottom:'0.75rem' },
+  googleBtn:    { width:'100%', display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.9rem 1.25rem', background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:12, fontSize:'0.95rem', fontWeight:700, color:'#1C1917', cursor:'pointer', boxShadow:'0 2px 10px rgba(0,0,0,0.07)', transition:'all 0.2s', fontFamily:"'Plus Jakarta Sans',sans-serif", marginBottom:'0.75rem' },
   note:         { textAlign:'center', color:'#78716C', fontSize:'0.75rem', marginBottom:'0.875rem' },
   terms:        { color:'#A8A29E', fontSize:'0.7rem', textAlign:'center', marginBottom:'0.4rem', marginTop:0 },
   termLink:     { color:'#D97706', cursor:'pointer' },
@@ -218,7 +218,7 @@ const s = {
 
   // Right panel
   rightBadge:   { display:'inline-block', background:'rgba(255,255,255,0.2)', border:'1px solid rgba(255,255,255,0.35)', color:'#fff', borderRadius:20, padding:'0.3rem 0.875rem', fontSize:'0.72rem', fontWeight:700, marginBottom:'1rem', letterSpacing:'0.03em' },
-  rightTitle:   { fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.75rem', color:'#fff', margin:'0 0 1.5rem', lineHeight:1.25 },
+  rightTitle:   { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.75rem', color:'#fff', margin:'0 0 1.5rem', lineHeight:1.25 },
 
   // Feature list
   featList:     { display:'flex', flexDirection:'column', gap:'0.625rem', marginBottom:'1.75rem' },

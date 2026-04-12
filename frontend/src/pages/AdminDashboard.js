@@ -121,7 +121,7 @@ function AdminFleet() {
         {[['🟢 On Trip',drivers.filter(d=>d.status==='on_trip').length],['🟡 Online',drivers.filter(d=>d.status==='online').length],['⚫ Offline',drivers.filter(d=>d.status==='offline').length]].map(([l,v]) => (
           <div key={l} style={{ ...s.card, flex:1, padding:'1rem', textAlign:'center' }}>
             <div style={{ fontSize:'0.75rem', color:C.text2, fontWeight:600 }}>{l}</div>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.5rem', color:C.text }}>{v}</div>
+            <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.5rem', color:C.text }}>{v}</div>
           </div>
         ))}
       </div>
@@ -129,7 +129,7 @@ function AdminFleet() {
       <div style={{ display:'flex', gap:'1.25rem', flexWrap:'wrap' }}>
         <div style={{ flex:'1 1 400px' }}>
           <div style={{ ...s.card, padding:0, overflow:'hidden' }}>
-            <div style={{ padding:'0.875rem 1.25rem', borderBottom:`1px solid ${C.border}`, fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:'0.9rem', color:C.text, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div style={{ padding:'0.875rem 1.25rem', borderBottom:`1px solid ${C.border}`, fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:700, fontSize:'0.9rem', color:C.text, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               Live Fleet Map
               <span style={s.liveBadge}>● LIVE</span>
             </div>
@@ -196,7 +196,7 @@ function AdminSOS() {
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'1rem' }}>
               <div>
                 <div style={{ display:'flex', gap:'0.5rem', alignItems:'center', marginBottom:'0.4rem' }}>
-                  <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1rem', color:C.text }}>🚨 {alert.type} Emergency</span>
+                  <span style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1rem', color:C.text }}>🚨 {alert.type} Emergency</span>
                   <span style={{ ...s.statusPill, background: alert.status === 'active' ? C.redBg : C.greenBg, color: alert.status === 'active' ? C.red : C.green, fontWeight:700 }}>{alert.status}</span>
                 </div>
                 <div style={{ color:C.text2, fontSize:'0.875rem' }}>Driver: {alert.driver} · {alert.vehicle}</div>
@@ -405,7 +405,7 @@ function AdminReports() {
     <div style={s.page}>
       <div style={{ ...s.card, background:'linear-gradient(135deg, #F59E0B, #D97706)', border:'none' }}>
         <div style={{ color:'rgba(255,255,255,0.8)', fontSize:'0.8rem', marginBottom:'0.25rem' }}>Auto-Generated Report</div>
-        <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.5rem', color:'#fff' }}>Daily Operations Report</div>
+        <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.5rem', color:'#fff' }}>Daily Operations Report</div>
         <div style={{ color:'rgba(255,255,255,0.9)', fontSize:'0.875rem' }}>{today}</div>
       </div>
 
@@ -413,7 +413,7 @@ function AdminReports() {
         {[['Total Trips', '6', C.text],['Completed', '5', C.green],['In Progress', '1', C.primary],['Cancelled', '0', C.text3],['Students Transported', '18', C.blue],['On-Time Rate', '94%', C.green],['SOS Alerts', '1', C.red],['Avg Driver Rating', '4.6 ⭐', C.primary]].map(([l,v,c]) => (
           <div key={l} style={{ ...s.card, textAlign:'center' }}>
             <div style={{ color:C.text3, fontSize:'0.72rem', textTransform:'uppercase', letterSpacing:'0.05em', fontWeight:600, marginBottom:'0.3rem' }}>{l}</div>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.5rem', color:c }}>{v}</div>
+            <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.5rem', color:c }}>{v}</div>
           </div>
         ))}
       </div>
@@ -661,7 +661,7 @@ const s = {
   page: { display:'flex', flexDirection:'column', gap:'1.5rem' },
   statsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px,1fr))', gap:'1rem' },
   card: { background:C.white, border:`1.5px solid ${C.border}`, borderRadius:16, padding:'1.5rem', boxShadow:'0 1px 4px rgba(245,158,11,0.06)' },
-  cardTitle: { fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:'1rem', color:C.text, marginBottom:'0.5rem' },
+  cardTitle: { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:700, fontSize:'1rem', color:C.text, marginBottom:'0.5rem' },
   statusPill: { padding:'0.2rem 0.6rem', borderRadius:6, fontSize:'0.72rem', fontWeight:700, textTransform:'capitalize', display:'inline-block' },
   liveBadge: { background:C.greenBg, color:C.green, padding:'0.25rem 0.6rem', borderRadius:99, fontSize:'0.7rem', fontWeight:700 },
   table: { background:C.white, border:`1.5px solid ${C.border}`, borderRadius:14, overflow:'hidden' },
@@ -669,7 +669,7 @@ const s = {
   tableRow: { display:'grid', padding:'0.875rem 1.25rem', borderTop:`1px solid ${C.border}`, fontSize:'0.875rem', color:C.text, alignItems:'center' },
   mono: { color:C.text3, fontFamily:'monospace', fontSize:'0.8rem' },
   empty: { color:C.text3, textAlign:'center', padding:'2rem', fontSize:'0.9rem' },
-  pageTitle: { fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.15rem', color:C.text },
+  pageTitle: { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.15rem', color:C.text },
   submitBtn: { background:C.primary, border:'none', color:'#fff', padding:'0.65rem 1.5rem', borderRadius:8, fontWeight:700, fontSize:'0.875rem' },
   field: { display:'flex', flexDirection:'column', gap:'0.35rem' },
   fieldLabel: { fontSize:'0.72rem', color:C.text2, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' },

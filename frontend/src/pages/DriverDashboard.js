@@ -272,7 +272,7 @@ function DriverTrip() {
       {!activeTrip ? (
         <div style={s.noTripBox}>
           <div style={{fontSize:'3.5rem',marginBottom:'1rem'}}>🚌</div>
-          <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:'1.5rem',fontWeight:800,marginBottom:'0.5rem',color:C.text,marginTop:0}}>No Active Trip</h2>
+          <h2 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'1.5rem',fontWeight:800,marginBottom:'0.5rem',color:C.text,marginTop:0}}>No Active Trip</h2>
           <p style={{color:C.text2,marginBottom:'2rem'}}>Start a trip to begin GPS tracking and marking attendance. Details will be saved to the database.</p>
           <button style={{...s.startTripBtn,cursor:'pointer',opacity:starting?0.8:1}} onClick={startTrip} disabled={starting}>
             {starting ? '⏳ Starting…' : '▶ Start Morning Trip'}
@@ -286,7 +286,7 @@ function DriverTrip() {
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
                 <div>
                   <div style={s.tripLabel}>Active Trip</div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:'1.1rem',color:C.text}}>Trip #{activeTrip.id} · {activeTrip.route}</div>
+                  <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:'1.1rem',color:C.text}}>Trip #{activeTrip.id} · {activeTrip.route}</div>
                 </div>
                 <div style={{display:'flex',gap:'0.6rem',alignItems:'center',flexWrap:'wrap'}}>
                   <span style={s.liveBadge}>● IN PROGRESS</span>
@@ -376,7 +376,7 @@ function DriverTrip() {
           <div style={s.tripSide}>
             {/* SOS */}
             <div style={{...s.card,background:C.redBg,borderColor:'#FECACA',textAlign:'center'}}>
-              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:'1rem',marginBottom:'0.4rem',color:C.text}}>🚨 Emergency SOS</div>
+              <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:'1rem',marginBottom:'0.4rem',color:C.text}}>🚨 Emergency SOS</div>
               <p style={{color:C.text2,fontSize:'0.8rem',marginBottom:'1.1rem',marginTop:0}}>Press for immediate assistance. Ops team and parents will be notified instantly.</p>
               <button style={{...s.sosBtn,cursor:'pointer'}} onClick={triggerSOS}>🆘 SOS ALERT</button>
             </div>
@@ -542,7 +542,7 @@ function DriverPenalties() {
                 <div style={{color:C.text3,fontSize:'0.75rem'}}>{p.date}</div>
               </div>
               <div style={{textAlign:'right',flexShrink:0,marginLeft:'1rem'}}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:'1.1rem',color:C.red}}>{p.amount}</div>
+                <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:'1.1rem',color:C.red}}>{p.amount}</div>
                 <span style={{...s.statusTag,background:(statusColor[p.status]||C.primary)+'18',color:statusColor[p.status]||C.primary}}>{p.status}</span>
               </div>
             </div>
@@ -590,7 +590,7 @@ function DriverProfile() {
         <div style={{display:'flex',gap:'1rem',alignItems:'center',flexWrap:'wrap'}}>
           <div style={{width:60,height:60,borderRadius:'50%',background:C.primary,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'1.4rem',flexShrink:0}}>{driver?.name?.charAt(0)||'D'}</div>
           <div style={{flex:1}}>
-            <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:'1.2rem',color:C.text}}>{driver?.name}</div>
+            <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:'1.2rem',color:C.text}}>{driver?.name}</div>
             <div style={{color:C.text2,fontSize:'0.875rem'}}>{driver?.email}</div>
             <div style={{color:C.text3,fontSize:'0.8rem'}}>{form.phone||driver?.phone}</div>
           </div>
@@ -634,7 +634,7 @@ function DriverProfile() {
           {[['🚌','Total Trips','42'],['✅','Completion Rate','97%'],['⭐','Rating','4.8'],['⏱️','Avg Delay','2 min'],['🎒','Students Transported','126'],['🛡️','Penalty-Free Days','18']].map(([icon,label,val]) => (
             <div key={label} style={{background:C.ultraLight,border:`1px solid ${C.border}`,borderRadius:12,padding:'0.875rem',textAlign:'center'}}>
               <div style={{fontSize:'1.3rem',marginBottom:'0.3rem'}}>{icon}</div>
-              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:'1.1rem',color:C.text}}>{val}</div>
+              <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:'1.1rem',color:C.text}}>{val}</div>
               <div style={{fontSize:'0.7rem',color:C.text3,marginTop:'0.15rem'}}>{label}</div>
             </div>
           ))}
@@ -658,35 +658,35 @@ const s = {
   loading: { color:C.text3, padding:'2rem', textAlign:'center' },
   statusBanner: { border:'1.5px solid', borderRadius:14, padding:'1.1rem 1.5rem', display:'flex', justifyContent:'space-between', alignItems:'center' },
   statusLabel: { color:C.text3, fontSize:'0.72rem', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'0.25rem' },
-  statusValue: { fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:'1.05rem' },
-  statusBtn: { padding:'0.55rem 1.35rem', borderRadius:10, border:'none', fontWeight:700, fontSize:'0.875rem', fontFamily:"'DM Sans',sans-serif" },
+  statusValue: { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:700, fontSize:'1.05rem' },
+  statusBtn: { padding:'0.55rem 1.35rem', borderRadius:10, border:'none', fontWeight:700, fontSize:'0.875rem', fontFamily:"'Plus Jakarta Sans',sans-serif" },
   statsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'1rem' },
   card: { background:C.white, border:`1.5px solid ${C.border}`, borderRadius:16, padding:'1.5rem', boxShadow:'0 1px 4px rgba(245,158,11,0.06)' },
-  cardTitle: { fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:'0.95rem', color:C.text, margin:'0 0 0.25rem' },
+  cardTitle: { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:700, fontSize:'0.95rem', color:C.text, margin:'0 0 0.25rem' },
   infoGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:'1.1rem', marginTop:'0.5rem' },
   iLabel: { color:C.text3, fontSize:'0.68rem', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'0.2rem' },
   iValue: { color:C.text, fontWeight:600, fontSize:'0.875rem' },
   badge: { padding:'0.2rem 0.5rem', borderRadius:6, fontSize:'0.72rem', fontWeight:600 },
   liveBadge: { background:C.greenBg, color:C.green, padding:'0.2rem 0.5rem', borderRadius:99, fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.05em' },
-  delayBtn: { background:C.light, border:`1px solid ${C.border}`, color:C.dark, padding:'0.4rem 0.875rem', borderRadius:8, fontSize:'0.78rem', fontWeight:600, fontFamily:"'DM Sans',sans-serif" },
-  endTripBtn: { background:C.redBg, border:`1px solid #FECACA`, color:C.red, padding:'0.4rem 0.875rem', borderRadius:8, fontSize:'0.78rem', fontWeight:600, fontFamily:"'DM Sans',sans-serif" },
-  startTripBtn: { background:C.primary, border:'none', color:'#fff', padding:'0.875rem 2.5rem', borderRadius:12, fontSize:'1rem', fontWeight:700, fontFamily:"'DM Sans',sans-serif" },
+  delayBtn: { background:C.light, border:`1px solid ${C.border}`, color:C.dark, padding:'0.4rem 0.875rem', borderRadius:8, fontSize:'0.78rem', fontWeight:600, fontFamily:"'Plus Jakarta Sans',sans-serif" },
+  endTripBtn: { background:C.redBg, border:`1px solid #FECACA`, color:C.red, padding:'0.4rem 0.875rem', borderRadius:8, fontSize:'0.78rem', fontWeight:600, fontFamily:"'Plus Jakarta Sans',sans-serif" },
+  startTripBtn: { background:C.primary, border:'none', color:'#fff', padding:'0.875rem 2.5rem', borderRadius:12, fontSize:'1rem', fontWeight:700, fontFamily:"'Plus Jakarta Sans',sans-serif" },
   tripLayout: { display:'flex', gap:'1.25rem', flexWrap:'wrap' },
   tripMain: { flex:'1 1 400px', display:'flex', flexDirection:'column', gap:'1rem' },
   tripSide: { flex:'0 0 260px', display:'flex', flexDirection:'column', gap:'1rem' },
   tripLabel: { color:C.text3, fontSize:'0.7rem', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'0.2rem' },
-  checkBtn: { padding:'0.3rem 0.6rem', borderRadius:6, border:'none', fontSize:'0.75rem', fontWeight:600, fontFamily:"'DM Sans',sans-serif" },
-  sosBtn: { background:C.red, border:'none', color:'#fff', padding:'0.75rem 2rem', borderRadius:10, fontWeight:800, fontSize:'0.95rem', width:'100%', fontFamily:"'DM Sans',sans-serif", letterSpacing:'0.03em' },
+  checkBtn: { padding:'0.3rem 0.6rem', borderRadius:6, border:'none', fontSize:'0.75rem', fontWeight:600, fontFamily:"'Plus Jakarta Sans',sans-serif" },
+  sosBtn: { background:C.red, border:'none', color:'#fff', padding:'0.75rem 2rem', borderRadius:10, fontWeight:800, fontSize:'0.95rem', width:'100%', fontFamily:"'Plus Jakarta Sans',sans-serif", letterSpacing:'0.03em' },
   noTripBox: { background:C.white, border:`1.5px solid ${C.border}`, borderRadius:16, padding:'4rem 2rem', textAlign:'center', boxShadow:'0 1px 4px rgba(245,158,11,0.06)' },
   formRow: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' },
-  input: { background:C.ultraLight, border:`1.5px solid ${C.border}`, borderRadius:8, padding:'0.65rem 0.875rem', color:C.text, fontSize:'0.9rem', fontFamily:"'DM Sans',sans-serif", boxSizing:'border-box', width:'100%', outline:'none' },
-  submitBtn: { background:C.primary, border:'none', color:'#fff', padding:'0.7rem 1.5rem', borderRadius:10, fontWeight:700, fontSize:'0.9rem', fontFamily:"'DM Sans',sans-serif" },
-  cancelBtn: { background:'transparent', border:`1px solid ${C.border}`, color:C.text2, padding:'0.65rem 1.25rem', borderRadius:8, fontFamily:"'DM Sans',sans-serif", cursor:'pointer' },
+  input: { background:C.ultraLight, border:`1.5px solid ${C.border}`, borderRadius:8, padding:'0.65rem 0.875rem', color:C.text, fontSize:'0.9rem', fontFamily:"'Plus Jakarta Sans',sans-serif", boxSizing:'border-box', width:'100%', outline:'none' },
+  submitBtn: { background:C.primary, border:'none', color:'#fff', padding:'0.7rem 1.5rem', borderRadius:10, fontWeight:700, fontSize:'0.9rem', fontFamily:"'Plus Jakarta Sans',sans-serif" },
+  cancelBtn: { background:'transparent', border:`1px solid ${C.border}`, color:C.text2, padding:'0.65rem 1.25rem', borderRadius:8, fontFamily:"'Plus Jakarta Sans',sans-serif", cursor:'pointer' },
   statusTag: { display:'inline-block', padding:'0.2rem 0.6rem', borderRadius:6, fontSize:'0.72rem', fontWeight:700, textTransform:'capitalize' },
   empty: { color:C.text3, textAlign:'center', padding:'2rem', fontSize:'0.9rem' },
-  pageTitle: { fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.15rem', color:C.text, margin:0 },
+  pageTitle: { fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:'1.15rem', color:C.text, margin:0 },
   verifiedBadge: { background:C.greenBg, color:C.green, padding:'0.3rem 0.75rem', borderRadius:8, fontSize:'0.78rem', fontWeight:600 },
   unverifiedBadge: { background:C.light, color:C.dark, padding:'0.3rem 0.75rem', borderRadius:8, fontSize:'0.78rem', fontWeight:600 },
-  smallActionBtn: { background:C.light, border:`1px solid ${C.border}`, color:C.dark, padding:'0.5rem 0.75rem', borderRadius:8, fontSize:'0.78rem', fontWeight:600, fontFamily:"'DM Sans',sans-serif", width:'100%', textAlign:'left' },
+  smallActionBtn: { background:C.light, border:`1px solid ${C.border}`, color:C.dark, padding:'0.5rem 0.75rem', borderRadius:8, fontSize:'0.78rem', fontWeight:600, fontFamily:"'Plus Jakarta Sans',sans-serif", width:'100%', textAlign:'left' },
 };
 

@@ -20,7 +20,7 @@ function ProtectedRoute({ children, roles }) {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1rem' }}>
         <div style={{ width:40, height:40, border:'3px solid #FDE68A', borderTopColor:'#F59E0B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div style={{ color:'#D97706', fontWeight:600, fontFamily:'DM Sans,sans-serif' }}>Loading Schuber…</div>
+        <div style={{ color:'#D97706', fontWeight:600, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>Loading Schuber…</div>
       </div>
     );
   }
@@ -46,7 +46,7 @@ function AppRoutes() {
 
   if (loading || (user && !profile)) {
     return (
-      <div style={{ textAlign:'center', marginTop:'50px', fontFamily:'DM Sans,sans-serif', color:'#D97706' }}>
+      <div style={{ textAlign:'center', marginTop:'50px', fontFamily:"'Plus Jakarta Sans',sans-serif", color:'#D97706' }}>
         Loading app…
       </div>
     );
