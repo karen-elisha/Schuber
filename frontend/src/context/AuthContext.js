@@ -107,7 +107,18 @@ export function AuthProvider({ children }) {
   }, [bootstrap]);
 
   async function login(email, password) {
-    // Check demo accounts first
+    // Try real Supabase login first
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!error && data?.user) {
+        const prof = await getProfile(data.user.id).catch(() => null);
+        return { ...data.user, role: prof?.role ?? 'parent' };
+      }
+    } catch (e) {
+      // If Supabase is unreachable, fall through to demo
+    }
+
+    // Fallback: demo accounts
     const demo = DEMO_ACCOUNTS[email?.toLowerCase()];
     if (demo && demo.password === password) {
       const demoProfile = { ...demo };
@@ -118,26 +129,48 @@ export function AuthProvider({ children }) {
       return { ...demo, role: demo.role };
     }
 
-    // Real Supabase login
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    const prof = await getProfile(data.user.id).catch(() => null);
-    return { ...data.user, role: prof?.role ?? 'parent' };
+    throw new Error('Invalid email or password. Please check your credentials and try again.');
   }
 
   async function register(email, password, fullName, role = 'parent', phone = '') {
     const { data, error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: fullName, phone } },
+      options: {
+        data: { full_name: fullName, phone, role },
+        emailRedirectTo: window.location.origin + '/login',
+      },
     });
     if (error) throw error;
 
     if (data.user) {
+      // Upsert profile with role
       await supabase.from('profiles').upsert(
         { id: data.user.id, role, full_name: fullName, email, phone },
         { onConflict:'id' }
       ).catch(e => console.error('[Auth] Profile upsert failed:', e.message));
+
+      // If driver, auto-create driver record
+      if (role === 'driver') {
+        await supabase.from('drivers').insert({
+          user_id: data.user.id,
+          verified: false,
+          is_online: false,
+          rating: 0,
+          capacity: 12,
+        }).catch(e => console.error('[Auth] Driver insert failed:', e.message));
+      }
+
+      // Check if session exists (email might be auto-confirmed)
+      if (data.session) {
+        // User is auto-logged in
+        const prof = { id: data.user.id, role, full_name: fullName, email, phone };
+        setUser(data.user);
+        setProfile(prof);
+        return data.user;
+      }
     }
+
+    // If no session, the user needs to confirm their email
     return data.user;
   }
 
@@ -192,4 +225,3 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-

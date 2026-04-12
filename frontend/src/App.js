@@ -11,14 +11,15 @@ import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import DriverVerificationPage from './pages/DriverVerificationPage';
 
-// 🔐 Protected Route - allows demo accounts to pass through
+// 🔐 Protected Route — strict role enforcement
 function ProtectedRoute({ children, roles }) {
   const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
       <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1rem' }}>
-        <div style={{ fontSize:'2rem' }}>🚌</div>
+        <div style={{ width:40, height:40, border:'3px solid #FDE68A', borderTopColor:'#F59E0B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <div style={{ color:'#D97706', fontWeight:600, fontFamily:'DM Sans,sans-serif' }}>Loading Schuber…</div>
       </div>
     );
@@ -27,22 +28,11 @@ function ProtectedRoute({ children, roles }) {
   // If not logged in at all, go to login
   if (!user) return <Navigate to="/login" replace />;
 
-  // ✅ ROLE CHECK — but allow if profile is loading or matches
+  // ✅ ROLE CHECK — redirect to correct dashboard if role mismatch
   if (roles && profile?.role && !roles.includes(profile.role)) {
-    // Redirect to the correct dashboard based on actual role
     return <Navigate to={`/${profile.role}`} replace />;
   }
 
-  return children;
-}
-
-// Flexible route: allows demo bypass navigation
-function FlexRoute({ children, roles }) {
-  const { user, profile, loading } = useAuth();
-  if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
-  // If user has a mismatched role, let them through to wherever they navigated
-  // (demo users navigated explicitly via navigate(), respect that)
   return children;
 }
 
@@ -75,21 +65,21 @@ function AppRoutes() {
       {/* PUBLIC */}
       <Route path="/driver-verification" element={<DriverVerificationPage />} />
 
-      {/* PROTECTED — flexible to allow demo navigation */}
+      {/* PROTECTED — strict role enforcement */}
       <Route path="/parent/*" element={
-        <FlexRoute roles={['parent']}>
+        <ProtectedRoute roles={['parent']}>
           <ParentDashboard />
-        </FlexRoute>
+        </ProtectedRoute>
       } />
       <Route path="/driver/*" element={
-        <FlexRoute roles={['driver']}>
+        <ProtectedRoute roles={['driver']}>
           <DriverDashboard />
-        </FlexRoute>
+        </ProtectedRoute>
       } />
       <Route path="/admin/*" element={
-        <FlexRoute roles={['admin']}>
+        <ProtectedRoute roles={['admin']}>
           <AdminDashboard />
-        </FlexRoute>
+        </ProtectedRoute>
       } />
 
       {/* FALLBACK */}

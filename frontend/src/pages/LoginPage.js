@@ -10,18 +10,34 @@ const demos = [
   { label: '🛡️ Admin', email: 'admin@schuber.com', password: 'admin123', role: 'admin', desc: 'Full fleet & operations control' },
 ];
 
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({});
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [loginRole, setLoginRole] = useState('parent');
   const [demoLoading, setDemoLoading] = useState(null);
 
+  const validate = () => {
+    const e = {};
+    if (!form.email.trim()) e.email = 'Email is required';
+    else if (!validateEmail(form.email)) e.email = 'Please enter a valid email address';
+    if (!form.password) e.password = 'Password is required';
+    else if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const handle = async (e) => {
     e.preventDefault();
+    if (!validate()) return;
     setError(''); setLoading(true);
     try {
       const user = await login(form.email, form.password);
@@ -44,11 +60,13 @@ export default function LoginPage() {
     setForm({ email: d.email, password: d.password });
     setLoginRole(d.role);
     setError('');
+    setErrors({});
   };
 
   const loginAsDemo = async (d) => {
     setDemoLoading(d.role);
     setError('');
+    setErrors({});
     try {
       const user = await login(d.email, d.password);
       const role = user?.role ?? d.role;
@@ -61,6 +79,10 @@ export default function LoginPage() {
     }
   };
 
+  const clearFieldError = (field) => {
+    if (errors[field]) setErrors(e => { const n = {...e}; delete n[field]; return n; });
+  };
+
   return (
     <div style={s.page}>
       <div style={s.blob1} /><div style={s.blob2} />
@@ -68,6 +90,8 @@ export default function LoginPage() {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
         .schuber-input:focus { border-color: #F59E0B !important; box-shadow: 0 0 0 3px rgba(245,158,11,0.15) !important; outline: none; }
+        .schuber-input.field-error { border-color: #DC2626 !important; }
+        .schuber-input.field-error:focus { box-shadow: 0 0 0 3px rgba(220,38,38,0.15) !important; }
         .google-btn:hover { background: #F9FAFB !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
         .demo-card:hover { border-color: #F59E0B !important; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(245,158,11,0.15) !important; }
         .role-tab:hover { background: #FEF3C7 !important; }
@@ -132,9 +156,12 @@ export default function LoginPage() {
               <label style={s.label}>Email Address</label>
               <div style={s.inputWrap}>
                 <span style={s.inputIcon}>✉️</span>
-                <input className="schuber-input" style={s.input} type="email" required value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="you@example.com" />
+                <input className={`schuber-input ${errors.email ? 'field-error' : ''}`}
+                  style={s.input} type="email" value={form.email}
+                  onChange={e => { setForm(f => ({ ...f, email: e.target.value })); clearFieldError('email'); }}
+                  placeholder="you@example.com" />
               </div>
+              {errors.email && <div style={s.fieldError}>{errors.email}</div>}
             </div>
             <div style={s.field}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -143,11 +170,14 @@ export default function LoginPage() {
               </div>
               <div style={s.inputWrap}>
                 <span style={s.inputIcon}>🔒</span>
-                <input className="schuber-input" style={{...s.input, paddingRight:'2.8rem'}} type={showPass ? 'text' : 'password'}
-                  required value={form.password}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="••••••••" />
+                <input className={`schuber-input ${errors.password ? 'field-error' : ''}`}
+                  style={{...s.input, paddingRight:'2.8rem'}} type={showPass ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={e => { setForm(f => ({ ...f, password: e.target.value })); clearFieldError('password'); }}
+                  placeholder="••••••••" />
                 <button type="button" onClick={() => setShowPass(v=>!v)} style={s.eyeBtn}>{showPass ? '🙈' : '👁️'}</button>
               </div>
+              {errors.password && <div style={s.fieldError}>{errors.password}</div>}
             </div>
             {error && <div style={s.error}>⚠️ {error}</div>}
             <button type="submit" disabled={loading} className="submit-btn" style={{...s.submit, opacity: loading ? 0.8 : 1}}>
@@ -207,6 +237,7 @@ const s = {
   eyeBtn: { position: 'absolute', right: '0.9rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: 0 },
   forgotLink: { fontSize: '0.75rem', color: '#D97706', fontWeight: 600, cursor: 'pointer' },
   error: { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '0.65rem 1rem', borderRadius: 10, fontSize: '0.84rem' },
+  fieldError: { color: '#DC2626', fontSize: '0.75rem', fontWeight: 500, marginTop: '0.15rem' },
   submit: { background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)', color: '#fff', border: 'none', padding: '0.85rem', borderRadius: 12, fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(245,158,11,0.4)', transition: 'transform 0.2s, box-shadow 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontFamily: "'DM Sans', sans-serif" },
   spinner: { width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' },
   switchText: { color: '#78716C', fontSize: '0.875rem', textAlign: 'center', marginBottom: 0 },

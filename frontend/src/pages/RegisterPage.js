@@ -29,16 +29,42 @@ export default function RegisterPage() {
     role: params.get('role') || 'parent', phone: '',
   });
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [reviewIdx, setReviewIdx] = useState(0);
 
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validatePhone = (phone) => !phone || /^[+]?[\d\s()-]{7,15}$/.test(phone);
+
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim()) e.name = 'Full name is required';
+    else if (form.name.trim().length < 2) e.name = 'Name must be at least 2 characters';
+    if (!form.email.trim()) e.email = 'Email is required';
+    else if (!validateEmail(form.email)) e.email = 'Please enter a valid email address';
+    if (!form.password) e.password = 'Password is required';
+    else if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
+    if (!form.confirmPassword) e.confirmPassword = 'Please confirm your password';
+    else if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match';
+    if (form.phone && !validatePhone(form.phone)) e.phone = 'Please enter a valid phone number';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const clearFieldError = (field) => {
+    if (errors[field]) setErrors(e => { const n = {...e}; delete n[field]; return n; });
+  };
+
+  const updateField = (field, value) => {
+    setForm(f => ({ ...f, [field]: value }));
+    clearFieldError(field);
+  };
+
   const handle = async (e) => {
     e.preventDefault();
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.'); return;
-    }
+    if (!validate()) return;
     setError(''); setLoading(true);
     try {
       const user = await register(form.email, form.password, form.name, form.role, form.phone);
@@ -133,39 +159,44 @@ export default function RegisterPage() {
             <div style={s.row}>
               <div style={s.field}>
                 <label style={s.label}>Full Name *</label>
-                <input className="reg-input" style={s.input} required value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Priya Sharma" />
+                <input className="reg-input" style={{...s.input, ...(errors.name ? {borderColor:'#DC2626'} : {})}} required value={form.name}
+                  onChange={e => updateField('name', e.target.value)} placeholder="Priya Sharma" />
+                {errors.name && <div style={s.fieldError}>{errors.name}</div>}
               </div>
               <div style={s.field}>
                 <label style={s.label}>Phone Number</label>
-                <input className="reg-input" style={s.input} value={form.phone}
-                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" />
+                <input className="reg-input" style={{...s.input, ...(errors.phone ? {borderColor:'#DC2626'} : {})}} value={form.phone}
+                  onChange={e => updateField('phone', e.target.value)} placeholder="+91 98765 43210" />
+                {errors.phone && <div style={s.fieldError}>{errors.phone}</div>}
               </div>
             </div>
             <div style={s.field}>
               <label style={s.label}>Email Address *</label>
-              <input className="reg-input" style={s.input} type="email" required value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="you@example.com" />
+              <input className="reg-input" style={{...s.input, ...(errors.email ? {borderColor:'#DC2626'} : {})}} type="email" required value={form.email}
+                onChange={e => updateField('email', e.target.value)} placeholder="you@example.com" />
+              {errors.email && <div style={s.fieldError}>{errors.email}</div>}
             </div>
             <div style={s.row}>
               <div style={s.field}>
                 <label style={s.label}>Password *</label>
                 <div style={{position:'relative'}}>
-                  <input className="reg-input" style={{...s.input, paddingRight:'2.5rem'}}
+                  <input className="reg-input" style={{...s.input, paddingRight:'2.5rem', ...(errors.password ? {borderColor:'#DC2626'} : {})}}
                     type={showPass ? 'text' : 'password'} required value={form.password}
-                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                    onChange={e => updateField('password', e.target.value)}
                     placeholder="Min. 6 characters" minLength={6} />
                   <button type="button" onClick={() => setShowPass(v=>!v)}
                     style={{position:'absolute',right:'0.75rem',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'0.9rem'}}>
                     {showPass ? '🙈' : '👁️'}
                   </button>
                 </div>
+                {errors.password && <div style={s.fieldError}>{errors.password}</div>}
               </div>
               <div style={s.field}>
                 <label style={s.label}>Confirm Password *</label>
-                <input className="reg-input" style={s.input} type="password" required value={form.confirmPassword}
-                  onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                <input className="reg-input" style={{...s.input, ...(errors.confirmPassword ? {borderColor:'#DC2626'} : {})}} type="password" required value={form.confirmPassword}
+                  onChange={e => updateField('confirmPassword', e.target.value)}
                   placeholder="Re-enter password" minLength={6} />
+                {errors.confirmPassword && <div style={s.fieldError}>{errors.confirmPassword}</div>}
               </div>
             </div>
             {error && <div style={s.error}>⚠️ {error}</div>}
@@ -286,6 +317,7 @@ const s = {
   terms: { color: '#A8A29E', fontSize: '0.7rem', textAlign: 'center', marginBottom: '0.4rem', marginTop: '0.5rem' },
   switchText: { color: '#78716C', fontSize: '0.875rem', textAlign: 'center', marginBottom: 0 },
   switchLink: { color: '#D97706', fontWeight: 700, textDecoration: 'none' },
+  fieldError: { color: '#DC2626', fontSize: '0.72rem', fontWeight: 500, marginTop: '0.15rem' },
   // Right Panel
   sidePanel: { flex: '0 0 400px', background: 'linear-gradient(160deg, #D97706 0%, #B45309 100%)', overflowY: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   sidePanelInner: { padding: '3rem 2.5rem', width: '100%' },
