@@ -17,12 +17,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnon, {
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 
-/** Sign in with Google (opens OAuth redirect) */
-export const signInWithGoogle = async () => {
+/** Sign in/up with Google (opens OAuth redirect).
+ *  Pass `role` so the profile row is created with the correct role after redirect. */
+export const signInWithGoogle = async (role = 'parent') => {
+  // Persist role so AuthContext can use it after the OAuth callback
+  if (role) localStorage.setItem('schuber-pending-role', role);
   return supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: window.location.origin + '/',
+      queryParams: { prompt: 'select_account' }, // always show account picker
     },
   });
 };

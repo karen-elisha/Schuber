@@ -89,10 +89,33 @@ export function AuthProvider({ children }) {
       }
 
       // Build profile from DB + metadata
-      const meta   = session.user.user_metadata ?? {};
-      const email  = session.user.email ?? '';
-      const dbProf = await fetchProfileRole(session.user.id, email);
-      const role   = bestRole(dbProf?.role, meta.role, email);
+      const meta        = session.user.user_metadata ?? {};
+      const email       = session.user.email ?? '';
+      const dbProf      = await fetchProfileRole(session.user.id, email);
+
+      // Check if this is a fresh Google sign-up with a pending role selection
+      const pendingRole = localStorage.getItem('schuber-pending-role');
+      const role        = dbProf?.role || pendingRole || bestRole(null, meta.role, email);
+
+      // If pending role — persist it to profiles table + create driver row if needed
+      if (pendingRole && !dbProf?.role) {
+        localStorage.removeItem('schuber-pending-role');
+        await supabase.from('profiles').upsert({
+          id:        session.user.id,
+          email,
+          role,
+          full_name: meta.full_name || meta.name || email,
+          phone:     meta.phone || null,
+        }, { onConflict: 'id' }).catch(() => {});
+
+        if (role === 'driver') {
+          await supabase.from('drivers').insert({
+            user_id: session.user.id, verified: false, is_online: false, rating: 0, capacity: 12,
+          }).catch(() => {});
+        }
+      } else {
+        localStorage.removeItem('schuber-pending-role');
+      }
 
       setProfile({
         id:         session.user.id,
