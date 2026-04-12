@@ -192,39 +192,40 @@ export function AuthProvider({ children }) {
   }
 
   // ── register() ─────────────────────────────────────────────────────────────
+  // Calls the backend which uses admin.createUser — email auto-confirmed,
+  // no confirmation email sent, no rate limits, works even when
+  // "Enable email signups" appears disabled in Supabase dashboard.
   async function register(email, password, fullName, role = 'parent', phone = '') {
-    const { data, error } = await supabase.auth.signUp({
-      email, password,
-      options: {
-        data: { full_name: fullName, phone, role },
-        emailRedirectTo: window.location.origin + '/login',
-      },
+    const API = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
+
+    const res = await fetch(`${API}/auth/register`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password, full_name: fullName, role, phone }),
     });
-    if (error) throw error;
 
-    if (data.user) {
-      // Upsert profile row
-      await supabase.from('profiles')
-        .upsert({ id: data.user.id, role, full_name: fullName, email, phone }, { onConflict: 'id' })
-        .catch(e => console.warn('[Auth] profile upsert:', e.message));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed.');
 
-      // Auto-create driver record
-      if (role === 'driver') {
-        await supabase.from('drivers')
-          .insert({ user_id: data.user.id, verified: false, is_online: false, rating: 0, capacity: 12 })
-          .catch(e => console.warn('[Auth] driver insert:', e.message));
-      }
+    // Backend returns a token — set Supabase session so auth state fires
+    if (data.token) {
+      const { data: sessionData } = await supabase.auth.setSession({
+        access_token:  data.token,
+        refresh_token: data.token, // backend only returns access_token; refresh handled by Supabase
+      });
 
-      if (data.session) {
-        const prof = { id: data.user.id, role, full_name: fullName, email, phone };
-        loginSetRef.current = true;
-        setUser(data.user);
-        setProfile(prof);
-        setLoading(false);
-        return data.user;
-      }
+      const supaUser = sessionData?.user || data.user;
+      const prof = { id: supaUser?.id || data.user.id, role, full_name: fullName, email, phone };
+      loginSetRef.current = true;
+      setUser(supaUser || data.user);
+      setProfile({ ...prof, role });
+      setIsDemoUser(false);
+      setLoading(false);
+      return { ...(supaUser || data.user), role };
     }
-    return data.user;
+
+    // No token (unlikely) — return user so caller can show "please sign in"
+    return null;
   }
 
   // ── logout() ───────────────────────────────────────────────────────────────
