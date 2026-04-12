@@ -21,8 +21,6 @@ app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', service: 'Schuber API' })
 );
 
-// ── Extra endpoints ──────────────────────────────────────────
-const { authenticate: auth } = require('./middleware');
 
 app.get('/api/subscription', auth, (req, res) => {
   res.json({ plan: 'trial', status: 'active', daysLeft: 5,
