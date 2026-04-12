@@ -2,11 +2,9 @@
   "version": 2,
   "name": "schuber",
   "framework": "create-react-app",
-
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
   "outputDirectory": "build",
-
   "routes": [
     {
       "src": "/api/(.*)",
