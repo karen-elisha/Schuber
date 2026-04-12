@@ -44,9 +44,9 @@ async function fetchProfileRole(userId, email) {
 
 function bestRole(dbRole, metaRole, email) {
   if (dbRole)   return dbRole;
-  if (metaRole) return metaRole;
+  if (metaRole && ['parent','driver','admin'].includes(metaRole)) return metaRole;
   if (email && KNOWN_ROLES[email?.toLowerCase()]) return KNOWN_ROLES[email.toLowerCase()];
-  return 'parent';
+  return null; // no default — user must choose a role
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -93,24 +93,30 @@ export function AuthProvider({ children }) {
       const email       = session.user.email ?? '';
       const dbProf      = await fetchProfileRole(session.user.id, email);
 
-      // Check if this is a fresh Google sign-up with a pending role selection
+      // Resolve role — priority: pending localStorage → DB profile → user_metadata → known email
+      // pendingRole is set by the role selector on login/register page before Google OAuth
       const pendingRole = localStorage.getItem('schuber-pending-role');
-      const role        = dbProf?.role || pendingRole || bestRole(null, meta.role, email);
+      const role = pendingRole
+        || dbProf?.role
+        || bestRole(null, meta.role, email);
 
-      // If pending role — persist it to profiles table
-      if (pendingRole && !dbProf?.role) {
+      if (!role) console.warn('[Auth] ⚠️  No role resolved for', email);
+
+      // Persist role to profiles table when:
+      //  - user just picked a role (pendingRole set), OR
+      //  - profile row has no role yet
+      if (pendingRole || !dbProf?.role) {
         localStorage.removeItem('schuber-pending-role');
         await supabase.from('profiles').upsert({
           id:        session.user.id,
           email,
-          role,
-          full_name: meta.full_name || meta.name || email,
-          phone:     meta.phone || null,
+          role:      role || 'parent',
+          full_name: dbProf?.full_name || meta.full_name || meta.name || email,
+          phone:     dbProf?.phone     || meta.phone     || null,
         }, { onConflict: 'id' }).catch(() => {});
 
-        // New driver → flag for verification form (don't create drivers row yet,
-        // the DriverVerificationPage will do it with full details)
-        if (role === 'driver') {
+        // New driver → flag for verification form
+        if (role === 'driver' && !dbProf?.role) {
           localStorage.setItem('schuber-driver-setup', '1');
         }
       } else {
@@ -177,15 +183,23 @@ export function AuthProvider({ children }) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (!error && data?.user) {
-          const meta   = data.user.user_metadata ?? {};
-          const dbProf = await fetchProfileRole(data.user.id, email);
-          const role   = bestRole(dbProf?.role, meta.role, email);
-          const fullProfile = { id: data.user.id, email, role,
+          const meta    = data.user.user_metadata ?? {};
+          const dbProf  = await fetchProfileRole(data.user.id, email);
+          // Use demo.role as guaranteed fallback — never let DB/metadata override known demo roles
+          const role    = dbProf?.role || demo.role;
+          const fullProfile = {
+            id:        data.user.id,
+            email,
+            role,
             full_name: dbProf?.full_name ?? meta.full_name ?? demo.full_name,
             phone:     dbProf?.phone     ?? meta.phone     ?? demo.phone,
           };
           loginSetRef.current = true;
-          setUser(data.user); setProfile(fullProfile); setIsDemoUser(false); setLoading(false);
+          setUser(data.user);
+          setProfile(fullProfile);
+          setIsDemoUser(false);
+          setLoading(false);
+          console.log('[Auth] ✅ demo real-login:', email, '→ role:', role);
           return { ...data.user, role };
         }
       } catch { /* fall through to local demo */ }
