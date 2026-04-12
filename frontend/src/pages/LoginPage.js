@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -10,7 +11,7 @@ const demos = [
 ];
 
 export default function LoginPage() {
-  useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -21,38 +22,47 @@ export default function LoginPage() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const { supabase } = await import('../supabase');
-      const { error } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
-      });
-      if (error) throw error;
-      navigate('/dashboard');
+      const user = await login(form.email, form.password);
+      // Route based on role
+      const role = user?.role ?? 'parent';
+      navigate(`/${role}`, { replace: true });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Sign-in failed. Check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
+    setError('');
     try {
       await signInWithGoogle();
+      // Redirect handled by Supabase OAuth → back to origin → AuthContext bootstrap
     } catch (err) {
       setError('Google sign-in failed. Please try again.');
     }
   };
 
+  const fillDemo = (d) => {
+    setForm({ email: d.email, password: d.password });
+    setError('');
+  };
+
   return (
     <div style={s.page}>
-      {/* Background decorative blobs */}
       <div style={s.blob1} />
       <div style={s.blob2} />
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .schuber-input:focus { border-color: #F59E0B !important; box-shadow: 0 0 0 3px rgba(245,158,11,0.15) !important; outline: none; }
+        .google-btn:hover { background: #F9FAFB !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
+        .demo-btn:hover { background: #FDE68A !important; }
+        .submit-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,0.5) !important; }
+      `}</style>
 
       <div style={s.container}>
-        {/* Logo */}
         <Link to="/" style={s.logoWrap}>
-          <img src="/logo.png" alt="Schuber Logo" style={s.logoImg} />
+          <div style={s.logoText}>🚌 <span style={{ color: '#F59E0B' }}>Schu</span>ber</div>
         </Link>
 
         <div style={s.card}>
@@ -60,7 +70,7 @@ export default function LoginPage() {
           <p style={s.sub}>Sign in to your Schuber account</p>
 
           {/* Google Sign-In */}
-          <button onClick={handleGoogle} style={s.googleBtn}>
+          <button onClick={handleGoogle} className="google-btn" style={s.googleBtn}>
             <svg width="20" height="20" viewBox="0 0 48 48" style={{flexShrink:0}}>
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
               <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -81,7 +91,7 @@ export default function LoginPage() {
               <label style={s.label}>Email Address</label>
               <div style={s.inputWrap}>
                 <span style={s.inputIcon}>✉️</span>
-                <input style={s.input} type="email" required value={form.email}
+                <input className="schuber-input" style={s.input} type="email" required value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="you@example.com" />
               </div>
@@ -89,11 +99,11 @@ export default function LoginPage() {
             <div style={s.field}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <label style={s.label}>Password</label>
-                <span style={s.forgotLink}>Forgot password?</span>
+                <span style={s.forgotLink} onClick={() => setError('Password reset: check your email.')}>Forgot password?</span>
               </div>
               <div style={s.inputWrap}>
                 <span style={s.inputIcon}>🔒</span>
-                <input style={{...s.input, paddingRight:'2.8rem'}} type={showPass ? 'text' : 'password'}
+                <input className="schuber-input" style={{...s.input, paddingRight:'2.8rem'}} type={showPass ? 'text' : 'password'}
                   required value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="••••••••" />
@@ -103,19 +113,23 @@ export default function LoginPage() {
               </div>
             </div>
             {error && <div style={s.error}>⚠️ {error}</div>}
-            <button type="submit" disabled={loading} style={s.submit}>
+            <button type="submit" disabled={loading} className="submit-btn" style={{...s.submit, opacity: loading ? 0.8 : 1}}>
               {loading ? <span style={s.spinner} /> : null}
-              {loading ? 'Signing in...' : 'Sign In →'}
+              {loading ? 'Signing in…' : 'Sign In →'}
             </button>
           </form>
+
+          {/* Admin quick-login note */}
+          <div style={s.adminNote}>
+            🛡️ <strong>Admin?</strong> Use <code style={{background:'#FEF3C7',padding:'1px 4px',borderRadius:4}}>admin@schuber.com</code> / <code style={{background:'#FEF3C7',padding:'1px 4px',borderRadius:4}}>admin123</code>
+          </div>
 
           {/* Demo accounts */}
           <div style={s.demoSection}>
             <p style={s.demoLabel}>Try a demo account</p>
             <div style={s.demoGrid}>
               {demos.map(d => (
-                <button key={d.label} style={s.demoBtn}
-                  onClick={() => setForm({ email: d.email, password: d.password })}>
+                <button key={d.label} className="demo-btn" style={s.demoBtn} onClick={() => fillDemo(d)}>
                   {d.label}
                 </button>
               ))}
@@ -127,7 +141,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Trust badges */}
         <div style={s.trustRow}>
           {['🔒 SSL Secured', '✅ Verified Drivers', '🛡️ AIS-140 Compliant'].map(t => (
             <span key={t} style={s.trustBadge}>{t}</span>
@@ -139,110 +152,37 @@ export default function LoginPage() {
 }
 
 const s = {
-  page: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #FFFBF0 0%, #FEF3C7 50%, #FFFBF0 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontFamily: "'DM Sans', sans-serif",
-    position: 'relative',
-    overflow: 'hidden',
-    padding: '2rem 1rem',
-  },
-  blob1: {
-    position: 'absolute', top: '-120px', right: '-120px',
-    width: 400, height: 400,
-    background: 'radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%)',
-    borderRadius: '50%', pointerEvents: 'none',
-  },
-  blob2: {
-    position: 'absolute', bottom: '-100px', left: '-100px',
-    width: 350, height: 350,
-    background: 'radial-gradient(circle, rgba(217,119,6,0.12) 0%, transparent 70%)',
-    borderRadius: '50%', pointerEvents: 'none',
-  },
-  container: {
-    width: '100%', maxWidth: 480,
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem',
-    position: 'relative', zIndex: 1,
-  },
-  logoWrap: { display: 'block' },
-  logoImg: { height: 90, objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.1))' },
-  card: {
-    width: '100%',
-    background: '#FFFFFF',
-    borderRadius: 24,
-    padding: '2.5rem',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(245,158,11,0.1)',
-    border: '1px solid rgba(253,230,138,0.5)',
-  },
-  heading: {
-    fontFamily: "'Syne', sans-serif", fontWeight: 800,
-    fontSize: '1.875rem', color: '#1C1917', textAlign: 'center', marginBottom: '0.3rem',
-  },
-  sub: { color: '#78716C', textAlign: 'center', marginBottom: '1.75rem', fontSize: '0.95rem' },
-  googleBtn: {
-    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    gap: '0.75rem', padding: '0.8rem 1rem',
-    background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 12,
-    fontSize: '0.95rem', fontWeight: 600, color: '#1C1917',
-    cursor: 'pointer', transition: 'all 0.2s',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-    marginBottom: '1.25rem',
-    fontFamily: "'DM Sans', sans-serif",
-  },
+  page: { minHeight: '100vh', background: 'linear-gradient(135deg, #FFFBF0 0%, #FEF3C7 50%, #FFFBF0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif", position: 'relative', overflow: 'hidden', padding: '2rem 1rem' },
+  blob1: { position: 'absolute', top: '-120px', right: '-120px', width: 400, height: 400, background: 'radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' },
+  blob2: { position: 'absolute', bottom: '-100px', left: '-100px', width: 350, height: 350, background: 'radial-gradient(circle, rgba(217,119,6,0.12) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' },
+  container: { width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', position: 'relative', zIndex: 1 },
+  logoWrap: { textDecoration: 'none' },
+  logoText: { fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '1.75rem', color: '#1C1917' },
+  card: { width: '100%', background: '#FFFFFF', borderRadius: 24, padding: '2.5rem', boxShadow: '0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(245,158,11,0.1)', border: '1px solid rgba(253,230,138,0.5)' },
+  heading: { fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '1.875rem', color: '#1C1917', textAlign: 'center', marginBottom: '0.3rem', marginTop: 0 },
+  sub: { color: '#78716C', textAlign: 'center', marginBottom: '1.75rem', fontSize: '0.95rem', marginTop: 0 },
+  googleBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '0.8rem 1rem', background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 12, fontSize: '0.95rem', fontWeight: 600, color: '#1C1917', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1.25rem', fontFamily: "'DM Sans', sans-serif" },
   dividerRow: { display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' },
   dividerLine: { flex: 1, height: 1, background: '#F3F4F6' },
   dividerTxt: { color: '#9CA3AF', fontSize: '0.78rem', whiteSpace: 'nowrap', fontWeight: 500 },
-  form: { display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' },
+  form: { display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1rem' },
   field: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   label: { fontSize: '0.78rem', color: '#57534E', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },
   inputWrap: { position: 'relative', display: 'flex', alignItems: 'center' },
-  inputIcon: { position: 'absolute', left: '0.9rem', fontSize: '1rem', pointerEvents: 'none' },
-  input: {
-    width: '100%', background: '#FAFAFA', border: '1.5px solid #E5E7EB', borderRadius: 12,
-    padding: '0.75rem 1rem 0.75rem 2.75rem', color: '#1C1917', fontSize: '0.95rem',
-    transition: 'border-color 0.2s, box-shadow 0.2s', outline: 'none',
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  eyeBtn: {
-    position: 'absolute', right: '0.9rem', background: 'none', border: 'none',
-    cursor: 'pointer', fontSize: '1rem', padding: 0,
-  },
+  inputIcon: { position: 'absolute', left: '0.9rem', fontSize: '1rem', pointerEvents: 'none', zIndex: 1 },
+  input: { width: '100%', background: '#FAFAFA', border: '1.5px solid #E5E7EB', borderRadius: 12, padding: '0.75rem 1rem 0.75rem 2.75rem', color: '#1C1917', fontSize: '0.95rem', transition: 'border-color 0.2s, box-shadow 0.2s', outline: 'none', fontFamily: "'DM Sans', sans-serif", boxSizing: 'border-box' },
+  eyeBtn: { position: 'absolute', right: '0.9rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: 0 },
   forgotLink: { fontSize: '0.78rem', color: '#D97706', fontWeight: 600, cursor: 'pointer' },
-  error: {
-    background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626',
-    padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.875rem',
-  },
-  submit: {
-    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-    color: '#fff', border: 'none', padding: '0.9rem', borderRadius: 12,
-    fontSize: '1rem', fontWeight: 700, cursor: 'pointer',
-    boxShadow: '0 4px 14px rgba(245,158,11,0.4)',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  spinner: {
-    width: 18, height: 18, border: '2px solid rgba(255,255,255,0.4)',
-    borderTopColor: '#fff', borderRadius: '50%',
-    display: 'inline-block', animation: 'spin 0.7s linear infinite',
-  },
+  error: { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.875rem' },
+  submit: { background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)', color: '#fff', border: 'none', padding: '0.9rem', borderRadius: 12, fontSize: '1rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(245,158,11,0.4)', transition: 'transform 0.2s, box-shadow 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontFamily: "'DM Sans', sans-serif" },
+  spinner: { width: 18, height: 18, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' },
+  adminNote: { background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '0.65rem 1rem', fontSize: '0.8rem', color: '#78716C', marginBottom: '1rem', lineHeight: 1.5 },
   demoSection: { marginBottom: '1.5rem' },
-  demoLabel: { fontSize: '0.75rem', color: '#A8A29E', fontWeight: 600, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' },
+  demoLabel: { fontSize: '0.75rem', color: '#A8A29E', fontWeight: 600, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem', marginTop: 0 },
   demoGrid: { display: 'flex', gap: '0.5rem' },
-  demoBtn: {
-    flex: 1, background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E',
-    padding: '0.5rem 0.5rem', borderRadius: 10, fontSize: '0.78rem', fontWeight: 600,
-    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-  },
-  switchText: { color: '#78716C', fontSize: '0.875rem', textAlign: 'center' },
+  demoBtn: { flex: 1, background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E', padding: '0.5rem', borderRadius: 10, fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'background 0.15s' },
+  switchText: { color: '#78716C', fontSize: '0.875rem', textAlign: 'center', marginBottom: 0 },
   switchLink: { color: '#D97706', fontWeight: 700 },
   trustRow: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' },
-  trustBadge: {
-    background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(253,230,138,0.6)',
-    borderRadius: 20, padding: '0.35rem 0.75rem', fontSize: '0.72rem', fontWeight: 600,
-    color: '#78716C', backdropFilter: 'blur(8px)',
-  },
+  trustBadge: { background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(253,230,138,0.6)', borderRadius: 20, padding: '0.35rem 0.75rem', fontSize: '0.72rem', fontWeight: 600, color: '#78716C', backdropFilter: 'blur(8px)' },
 };

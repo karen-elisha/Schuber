@@ -1,4 +1,3 @@
-// frontend/src/context/AuthContext.js
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase, getProfile, signInWithGoogle, signOut } from '../supabase';
@@ -10,6 +9,8 @@ const DEFAULT_PROFILE_FALLBACK = (user) => ({
   role: 'parent',
   full_name: user.user_metadata?.full_name ?? user.email ?? 'User',
   email: user.email,
+  avatar_url: user.user_metadata?.avatar_url ?? null,
+  phone: user.user_metadata?.phone ?? null,
 });
 
 export function AuthProvider({ children }) {
@@ -18,9 +19,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
-  // ─────────────────────────────────────────────
-  // Core bootstrap: called on every session change
-  // ─────────────────────────────────────────────
+  // ─── Bootstrap: loads profile after session is confirmed ──────────────────
   const bootstrap = useCallback(async (session) => {
     try {
       setAuthError(null);
@@ -34,93 +33,67 @@ export function AuthProvider({ children }) {
       const currentUser = session.user;
       setUser(currentUser);
 
-      // ── Fetch profile with retry ──
+      // Fetch profile with retry (handles race condition after signup)
       let prof = null;
-      let fetchAttempts = 0;
-      const MAX_ATTEMPTS = 3;
-
-      while (!prof && fetchAttempts < MAX_ATTEMPTS) {
-        fetchAttempts++;
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           prof = await getProfile(currentUser.id);
+          break;
         } catch (err) {
-          console.warn(`Profile fetch attempt ${fetchAttempts} failed:`, err?.message ?? err);
-          if (fetchAttempts < MAX_ATTEMPTS) {
-            // Brief back-off between retries (handles race condition after signup)
-            await new Promise((r) => setTimeout(r, 600 * fetchAttempts));
-          }
+          console.warn(`[Auth] Profile fetch attempt ${attempt} failed:`, err?.message);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 600 * attempt));
         }
       }
 
-      console.log('[Auth] Profile result:', prof);
-
-      // ── Profile missing entirely → create it ──
+      // Profile missing → create default
       if (!prof) {
-        console.warn('[Auth] Profile not found after retries. Creating default profile…');
+        console.warn('[Auth] Profile not found. Creating fallback…');
         const fallback = DEFAULT_PROFILE_FALLBACK(currentUser);
-
         const { error: upsertError } = await supabase
           .from('profiles')
           .upsert(fallback, { onConflict: 'id' });
-
-        if (upsertError) {
-          console.error('[Auth] Failed to create fallback profile:', upsertError.message);
-          // Still set a client-side profile so the UI doesn't break
-          setProfile(fallback);
-        } else {
-          console.log('[Auth] Fallback profile created successfully.');
-          setProfile(fallback);
-        }
+        if (upsertError) console.error('[Auth] Fallback upsert failed:', upsertError.message);
+        setProfile(fallback);
         return;
       }
 
-      // ── Profile exists but role missing → patch it ──
+      // Role missing → patch to parent
       if (!prof.role) {
-        console.warn('[Auth] Profile has no role. Patching to "parent"…');
-        const { error: patchError } = await supabase
-          .from('profiles')
-          .update({ role: 'parent' })
-          .eq('id', currentUser.id);
-
-        if (patchError) {
-          console.error('[Auth] Role patch failed:', patchError.message);
-        }
+        await supabase.from('profiles').update({ role: 'parent' }).eq('id', currentUser.id);
         prof = { ...prof, role: 'parent' };
+      }
+
+      // Merge OAuth avatar if not yet set
+      if (!prof.avatar_url && currentUser.user_metadata?.avatar_url) {
+        prof = { ...prof, avatar_url: currentUser.user_metadata.avatar_url };
       }
 
       setProfile(prof);
     } catch (err) {
-      console.error('[Auth] Unexpected bootstrap error:', err);
+      console.error('[Auth] Bootstrap error:', err);
       setAuthError(err?.message ?? 'Authentication error');
-      // Do NOT sign out or clear the user on generic errors
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // ─────────────────────────────────────────────
-  // Initialise on mount
-  // ─────────────────────────────────────────────
+  // ─── Initialise on mount ──────────────────────────────────────────────────
   useEffect(() => {
-    console.log('[Auth] Initialising…');
-
-    // Get initial session
+    // Get initial session (handles page refresh + OAuth redirect)
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) console.error('[Auth] getSession error:', error.message);
       bootstrap(session);
     });
 
-    // Listen to subsequent auth events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('[Auth] State change:', event);
-        bootstrap(session);
-      }
-    );
+    // Listen to auth events (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] Event:', event);
+      bootstrap(session);
+    });
 
-    // Safety fallback — prevents infinite loading spinner
+    // Safety timeout — prevents infinite loading
     const timeout = setTimeout(() => {
-      console.warn('[Auth] ⚠️ Timeout reached — forcing loading to false');
+      console.warn('[Auth] Timeout — forcing loading off');
       setLoading(false);
     }, 8000);
 
@@ -130,61 +103,42 @@ export function AuthProvider({ children }) {
     };
   }, [bootstrap]);
 
-  // ─────────────────────────────────────────────
-  // Email / password login
-  // ─────────────────────────────────────────────
+  // ─── Email/password login ─────────────────────────────────────────────────
   async function login(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-
-    // Profile will be loaded by onAuthStateChange → bootstrap
-    // Return a minimal shape so the calling component can act immediately
     const prof = await getProfile(data.user.id).catch(() => null);
-    return {
-      ...data.user,
-      role: prof?.role ?? 'parent',
-    };
+    return { ...data.user, role: prof?.role ?? 'parent' };
   }
 
-  // ─────────────────────────────────────────────
-  // Registration
-  // ─────────────────────────────────────────────
-  async function register(email, password, fullName, role = 'parent') {
+  // ─── Registration ─────────────────────────────────────────────────────────
+  async function register(email, password, fullName, role = 'parent', phone = '') {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, phone } },
     });
-
     if (error) throw error;
 
     if (data.user) {
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert(
-          { id: data.user.id, role, full_name: fullName, email },
+          { id: data.user.id, role, full_name: fullName, email, phone },
           { onConflict: 'id' }
         );
-
-      if (profileError) {
-        console.error('[Auth] Profile upsert failed on register:', profileError.message);
-      }
+      if (profileError) console.error('[Auth] Profile upsert failed:', profileError.message);
     }
 
     return data.user;
   }
 
-  // ─────────────────────────────────────────────
-  // Helpers
-  // ─────────────────────────────────────────────
+  // ─── Helpers ──────────────────────────────────────────────────────────────
   async function getAuthHeader() {
     const { data: { session } } = await supabase.auth.getSession();
-    return session
-      ? { Authorization: `Bearer ${session.access_token}` }
-      : {};
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {};
   }
 
-  /** Force-refresh the profile from the DB (e.g. after profile edit) */
   async function refreshProfile() {
     if (!user) return;
     try {
@@ -195,9 +149,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // ─────────────────────────────────────────────
-  // Context value
-  // ─────────────────────────────────────────────
+  // ─── Context value ────────────────────────────────────────────────────────
   const value = {
     user,
     profile,
@@ -207,6 +159,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     signOut,
+    logout: signOut,          // alias so Layout.js works unchanged
     signInWithGoogle,
     getAuthHeader,
     refreshProfile,
@@ -215,18 +168,13 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={value}>
       {loading ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100vh',
-            fontFamily: 'sans-serif',
-            fontSize: '1rem',
-            color: '#888',
-          }}
-        >
-          Loading…
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          height: '100vh', background: '#FFFBF0', flexDirection: 'column', gap: '1rem',
+        }}>
+          <div style={{ width: 40, height: 40, border: '3px solid #FDE68A', borderTopColor: '#F59E0B', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ color: '#D97706', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Loading Schuber…</div>
         </div>
       ) : (
         children

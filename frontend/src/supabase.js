@@ -1,22 +1,29 @@
-// frontend/src/supabase.js
-// npm install @supabase/supabase-js
-
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl  = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnon = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnon);
+// ⚠️  FIX: Use localStorage (not cookies) so auth persists across tabs/non-incognito.
+//    The default in Supabase v2 is localStorage, but we make it explicit.
+export const supabase = createClient(supabaseUrl, supabaseAnon, {
+  auth: {
+    storage: window.localStorage,
+    storageKey: 'schuber-auth',
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,    // handles OAuth redirect tokens in URL
+  },
+});
 
-// ─── Auth helpers ───────────────────────────────────────────
+// ─── Auth helpers ────────────────────────────────────────────────────────────
 
-/** Sign in with Google (opens OAuth popup/redirect) */
+/** Sign in with Google (opens OAuth redirect) */
 export const signInWithGoogle = async () => {
   return supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.origin + '/profile'
-    }
+      redirectTo: window.location.origin + '/',
+    },
   });
 };
 
