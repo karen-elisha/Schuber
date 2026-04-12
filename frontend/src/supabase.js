@@ -3,17 +3,28 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl  = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnon = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
+if (!supabaseUrl || !supabaseAnon) {
+  console.error(
+    '🔴 Supabase configuration missing! \n' +
+    'Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in your .env file or Vercel dashboard.'
+  );
+}
+
 // ⚠️  FIX: Use localStorage (not cookies) so auth persists across tabs/non-incognito.
 //    The default in Supabase v2 is localStorage, but we make it explicit.
-export const supabase = createClient(supabaseUrl, supabaseAnon, {
-  auth: {
-    storage: window.localStorage,
-    storageKey: 'schuber-auth',
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,    // handles OAuth redirect tokens in URL
-  },
-});
+export const supabase = createClient(
+  supabaseUrl || 'https://missing-url.supabase.co', 
+  supabaseAnon || 'missing-key', 
+  {
+    auth: {
+      storage: window.localStorage,
+      storageKey: 'schuber-auth',
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,    // handles OAuth redirect tokens in URL
+    },
+  }
+);
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 

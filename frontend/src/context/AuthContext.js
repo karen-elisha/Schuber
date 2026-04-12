@@ -206,7 +206,10 @@ export function AuthProvider({ children }) {
         has_driver_profile: resolvedRole !== 'driver' || (dbProf?.driver_profile_exists ?? false),
         is_verified: dbProf?.is_verified ?? false,
       });
+    } catch (err) {
+      console.error('[Auth] 💥 Bootstrap crashed:', err);
     } finally {
+      // ✅ ESSENTIAL: Ensure loading ends so user isn't stuck on yellow screen
       setLoading(false);
     }
   }
@@ -344,10 +347,17 @@ export function AuthProvider({ children }) {
       getAuthHeader, refreshProfile,
     }}>
       {loading ? (
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1rem' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1.5rem', textAlign:'center' }}>
           <div style={{ width:40, height:40, border:'3px solid #FDE68A', borderTopColor:'#F59E0B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
           <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
-          <div style={{ color:'#D97706', fontWeight:600, fontFamily:'DM Sans,sans-serif' }}>Loading Schuber…</div>
+          <div>
+            <div style={{ color:'#D97706', fontWeight:600, fontFamily:'Plus Jakarta Sans,sans-serif', fontSize:'1.1rem' }}>Loading Schuber…</div>
+            {(!process.env.REACT_APP_SUPABASE_URL) && (
+              <div style={{ color:'#92400E', fontSize:'0.8rem', marginTop:'0.5rem', opacity:0.8 }}>
+                Configuration missing. Check Vercel logs.
+              </div>
+            )}
+          </div>
         </div>
       ) : children}
     </AuthContext.Provider>
