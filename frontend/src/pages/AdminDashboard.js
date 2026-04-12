@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import StatCard from '../components/StatCard';
 import LiveMap from '../components/LiveMap';
 import api from '../api';
+import { getAllDrivers, getAllStudents, getAllTrips } from '../dbClient';
 
 const C = { primary:'#F59E0B', dark:'#D97706', light:'#FEF3C7', ultraLight:'#FFFBEB', border:'#FDE68A', text:'#1C1917', text2:'#57534E', text3:'#A8A29E', white:'#FFFFFF', green:'#059669', greenBg:'#DCFCE7', red:'#DC2626', redBg:'#FEF2F2', blue:'#2563EB', blueBg:'#EFF6FF' };
 
@@ -71,8 +72,8 @@ function AdminOverview() {
   const [drivers, setDrivers] = useState(DUMMY_DRIVERS);
   const [trips, setTrips] = useState(DUMMY_TRIPS);
   useEffect(() => {
-    api.get('/drivers').then(setDrivers).catch(() => {});
-    api.get('/trips').then(setTrips).catch(() => {});
+    getAllDrivers().then(setDrivers).catch(() => api.get('/drivers').then(setDrivers).catch(() => {}));
+    getAllTrips().then(setTrips).catch(() => api.get('/trips').then(setTrips).catch(() => {}));
   }, []);
   const active = drivers.filter(d => d.status !== 'offline').length;
   const onTrip = trips.filter(t => t.status === 'in_progress').length;
@@ -544,8 +545,8 @@ function AdminAssignStudents() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/students').catch(() => []),
-      api.get('/drivers').catch(() => []),
+      getAllStudents().catch(() => api.get('/students').catch(() => [])),
+      getAllDrivers().catch(() => api.get('/drivers').catch(() => [])),
     ]).then(([sts, drvs]) => {
       const studentList = Array.isArray(sts) ? sts : [];
       const driverList  = Array.isArray(drvs) ? drvs : [];

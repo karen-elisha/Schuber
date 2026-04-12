@@ -5,6 +5,8 @@ import Layout from '../components/Layout';
 import StatCard from '../components/StatCard';
 import LiveMap from '../components/LiveMap';
 import api from '../api';
+import { useAuth } from '../context/AuthContext';
+import { getDriverProfile, getAssignedStudents, getDriverTrips } from '../dbClient';
 
 const C = { primary:'#F59E0B', dark:'#D97706', light:'#FEF3C7', ultraLight:'#FFFBEB', border:'#FDE68A', text:'#1C1917', text2:'#57534E', text3:'#A8A29E', white:'#FFFFFF', green:'#059669', greenBg:'#DCFCE7', red:'#DC2626', redBg:'#FEF2F2', blue:'#2563EB', blueBg:'#EFF6FF' };
 
@@ -52,35 +54,33 @@ export default function DriverDashboard() {
 
 // ── Home ─────────────────────────────────────────────────────────────────────
 function DriverHome() {
-  const [driverInfo, setDriverInfo] = useState(DUMMY_DRIVER);
+  const { user } = useAuth();
+  const [driverInfo, setDriverInfo] = useState(null);
   const [students, setStudents] = useState([]);
-  const [trips, setTrips] = useState(DUMMY_TRIPS);
+  const [trips, setTrips] = useState([]);
   const [status, setStatus] = useState('offline');
   const [toggling, setToggling] = useState(false);
-  const [loadingStudents, setLoadingStudents] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/drivers/me').then(d => {
-      if (d) {
-        setDriverInfo(d);
-        setStatus(d?.status || 'offline');
-        // Now fetch assigned students using the driver's DB ID
-        if (d.id) {
-          api.get(`/drivers/${d.id}/students`)
-            .then(sts => { if (Array.isArray(sts)) setStudents(sts); })
-            .catch(() => setStudents(DUMMY_STUDENTS))
-            .finally(() => setLoadingStudents(false));
-        } else {
-          setStudents(DUMMY_STUDENTS);
-          setLoadingStudents(false);
-        }
+    if (!user?.id) return;
+    // 1. Get driver profile directly from Supabase
+    getDriverProfile(user.id).then(async (d) => {
+      if (!d) { setLoading(false); return; }
+      setDriverInfo(d);
+      setStatus(d.status || 'offline');
+      // 2. Get assigned students using the driver record's UUID
+      if (d.id) {
+        const [sts, trs] = await Promise.all([
+          getAssignedStudents(d.id).catch(() => []),
+          getDriverTrips(d.id).catch(() => []),
+        ]);
+        if (sts.length) setStudents(sts);
+        if (trs.length) setTrips(trs);
       }
-    }).catch(() => {
-      setStudents(DUMMY_STUDENTS);
-      setLoadingStudents(false);
-    });
-    api.get('/trips').then(d => Array.isArray(d) && d.length && setTrips(d)).catch(() => {});
-  }, []);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [user?.id]);
+
 
   const toggleStatus = async () => {
     const ns = status === 'offline' ? 'online' : 'offline';
@@ -121,7 +121,7 @@ function DriverHome() {
       )}
 
       <div style={s.statsGrid}>
-        <StatCard icon="🎒" label="Assigned Students" value={loadingStudents ? '…' : students.length} sub="On your route" />
+        <StatCard icon="🎒" label="Assigned Students" value={loading ? '…' : students.length} sub="On your route" />
         <StatCard icon="✅" label="Trips Today" value={trips.filter(t=>t.date===new Date().toISOString().split('T')[0]).length || 0} color={C.green} sub="Completed" />
         <StatCard icon="⭐" label="Your Rating" value={driverInfo?.rating||'—'} color="#8B5CF6" sub="Average" />
         <StatCard icon="🛡️" label="Verified" value={driverInfo?.verified?'✓ Yes':'✗ No'} color={driverInfo?.verified?C.green:C.red} />
@@ -432,22 +432,21 @@ function DriverTrip() {
 
 // ── Students ─────────────────────────────────────────────────────────────────
 function DriverStudents() {
+  const { user } = useAuth();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    api.get('/drivers/me').then(d => {
-      if (d?.id) {
-        return api.get(`/drivers/${d.id}/students`);
-      }
+    if (!user?.id) return;
+    getDriverProfile(user.id).then(d => {
+      if (d?.id) return getAssignedStudents(d.id);
       return [];
     }).then(sts => {
       if (Array.isArray(sts) && sts.length) setStudents(sts);
-      else setStudents(DUMMY_STUDENTS);
-    }).catch(() => setStudents(DUMMY_STUDENTS))
+    }).catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.id]);
 
   const filtered = students.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()) || s.school?.toLowerCase().includes(search.toLowerCase()));
 

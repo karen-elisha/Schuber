@@ -5,6 +5,8 @@ import StatCard from '../components/StatCard';
 import LiveMap from '../components/LiveMap';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { getMyStudents, getMyTrips, getMyNotifications } from '../dbClient';
+import { supabase } from '../supabase';
 
 const C = { primary:'#F59E0B', dark:'#D97706', light:'#FEF3C7', ultraLight:'#FFFBEB', border:'#FDE68A', text:'#1C1917', text2:'#57534E', text3:'#A8A29E', white:'#FFFFFF', green:'#059669', greenBg:'#DCFCE7', red:'#DC2626', redBg:'#FEF2F2', blue:'#2563EB', blueBg:'#EFF6FF' };
 
@@ -67,15 +69,26 @@ export default function ParentDashboard() {
 
 // ── Home ─────────────────────────────────────────────────────────────────────
 function ParentHome() {
-  const [students, setStudents] = useState(DUMMY_STUDENTS);
-  const [activeTrip, setActiveTrip] = useState(DUMMY_ACTIVE);
-  const [notifs, setNotifs] = useState(DUMMY_NOTIFS);
+  const { user, profile } = useAuth();
+  const [students, setStudents] = useState([]);
+  const [activeTrip, setActiveTrip] = useState(null);
+  const [notifs, setNotifs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    api.get('/students').then(setStudents).catch(() => {});
+    if (!user?.id) return;
+    Promise.all([
+      getMyStudents(user.id).catch(() => []),
+      getMyNotifications(user.id).catch(() => []),
+    ]).then(([sts, nfs]) => {
+      if (sts.length)  setStudents(sts);
+      if (nfs.length)  setNotifs(nfs);
+    }).finally(() => setLoading(false));
+    // also try active trip via backend (with fallback)
     api.get('/trips/active').then(d => d && setActiveTrip(d)).catch(() => {});
-    api.get('/notifications').then(d => Array.isArray(d) && d.length && setNotifs(d)).catch(() => {});
-  }, []);
-  const unread = notifs.filter(n => !n.read).length;
+  }, [user?.id]);
+
+  const unread = notifs.filter(n => !n.read && !n.is_read).length;
   return (
     <div style={s.page}>
       <div style={s.statsGrid}>
@@ -252,32 +265,43 @@ function ParentTracking() {
 
 // ── Students ─────────────────────────────────────────────────────────────────
 function ParentStudents() {
-  const [students, setStudents] = useState(DUMMY_STUDENTS);
+  const { user } = useAuth();
+  const [students, setStudents] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name:'', school:'', grade:'', pickup_address:'', drop_address:'' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
+  const reload = () => {
+    if (!user?.id) return;
+    getMyStudents(user.id).then(d => { if (d.length) setStudents(d); }).catch(() => {});
+  };
+
   useEffect(() => {
-    api.get('/students').then(d => Array.isArray(d) && d.length && setStudents(d)).catch(() => {});
-    api.get('/drivers').then(d => Array.isArray(d) && setDrivers(d)).catch(() => {});
-  }, []);
+    reload();
+    supabase.from('drivers').select('id, vehicle_no, vehicle_model, rating, is_online, verified, profiles(full_name)').then(({ data }) => {
+      if (data) setDrivers(data.map(d => ({ id: d.id, name: d.profiles?.full_name, vehicle_no: d.vehicle_no, verified: d.verified, vehicle_model: d.vehicle_model, rating: d.rating })));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const addStudent = async (e) => {
     e.preventDefault(); setSaving(true); setMsg('');
     try {
-      const st = await api.post('/students', form);
-      setStudents(p => [...p, st]);
+      // Write via backend, then refresh from Supabase
+      await api.post('/students', { ...form });
+      await reload();
       setShowAdd(false);
       setForm({ name:'', school:'', grade:'', pickup_address:'', drop_address:'' });
-      setMsg('✅ Child added and saved to database!');
+      setMsg('✅ Child added successfully!');
       setTimeout(() => setMsg(''), 4000);
-    } catch (err) {
-      const localSt = { id: Date.now(), ...form, driver_name: null, vehicle_no: null, van_status: 'offline' };
+    } catch {
+      // Offline fallback
+      const localSt = { id: Date.now(), ...form, driver_id: null, driver_name: null, vehicle_no: null, van_status: 'offline' };
       setStudents(p => [...p, localSt]);
       setShowAdd(false);
-      setMsg('⚠️ Saved locally — sync when back online.');
+      setMsg('⚠️ Saved locally — will sync when online.');
       setTimeout(() => setMsg(''), 4000);
     }
     setSaving(false);
@@ -349,12 +373,14 @@ function ParentStudents() {
 
 // ── Trips ─────────────────────────────────────────────────────────────────────
 function ParentTrips() {
-  const [trips, setTrips] = useState(DUMMY_TRIPS);
+  const { user } = useAuth();
+  const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   useEffect(() => {
-    api.get('/trips').then(d => { if (Array.isArray(d) && d.length) setTrips(d); }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+    if (!user?.id) return;
+    getMyTrips(user.id).then(d => { if (d.length) setTrips(d); }).catch(() => {}).finally(() => setLoading(false));
+  }, [user?.id]);
   const statusColor = { in_progress:C.green, completed:C.text3, scheduled:C.primary, cancelled:C.red };
   const filtered = filter === 'all' ? trips : trips.filter(t => t.status === filter);
   return (
@@ -396,13 +422,15 @@ function ParentTrips() {
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 function ParentNotifications() {
-  const [notifs, setNotifs] = useState(DUMMY_NOTIFS);
+  const { user } = useAuth();
+  const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    api.get('/notifications').then(d => { if (Array.isArray(d) && d.length) setNotifs(d); }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+    if (!user?.id) return;
+    getMyNotifications(user.id).then(d => { if (d.length) setNotifs(d); }).catch(() => {}).finally(() => setLoading(false));
+  }, [user?.id]);
 
   const markRead = async (id) => {
     await api.patch(`/notifications/${id}/read`).catch(() => {});

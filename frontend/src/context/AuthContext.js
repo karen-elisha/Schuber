@@ -1,119 +1,119 @@
+/**
+ * AuthContext — Simple, bulletproof auth with role-based routing
+ *
+ * Role resolution order (most → least reliable):
+ *   1. profiles table in DB        (most reliable, set by seed/admin)
+ *   2. user_metadata.role          (set in Supabase Auth on signup)
+ *   3. KNOWN_ROLES email map       (hardcoded for demo accounts)
+ *   4. 'parent'                    (safe default)
+ *
+ * Key design:  login() sets profile immediately in React state.
+ *              A ref guards against bootstrap() overwriting it.
+ */
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { supabase, getProfile, signInWithGoogle, signOut } from '../supabase';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { supabase, signInWithGoogle, signOut } from '../supabase';
 
 const AuthContext = createContext(null);
 
-// Demo accounts — work even without Supabase connectivity
+// ── Demo accounts (local fallback when Supabase auth is unavailable) ──────────
 const DEMO_ACCOUNTS = {
-  'priya@example.com':   { password:'parent123', role:'parent', full_name:'Priya Sharma', id:'demo-parent-001', email:'priya@example.com', phone:'+91 98765 43210' },
-  'suresh@example.com':  { password:'driver123', role:'driver', full_name:'Suresh Kumar', id:'demo-driver-001', email:'suresh@example.com', phone:'+91 98765 99999' },
-  'admin@schuber.com':   { password:'admin123',  role:'admin',  full_name:'Schuber Admin', id:'demo-admin-001', email:'admin@schuber.com', phone:'+91 98765 00000' },
+  'priya@example.com':  { password:'parent123', role:'parent', full_name:'Priya Sharma',   id:'demo-parent-001', email:'priya@example.com',  phone:'+91 98765 43210' },
+  'suresh@example.com': { password:'driver123', role:'driver', full_name:'Suresh Kumar',   id:'demo-driver-001', email:'suresh@example.com', phone:'+91 98765 99999' },
+  'admin@schuber.com':  { password:'admin123',  role:'admin',  full_name:'Schuber Admin',  id:'demo-admin-001',  email:'admin@schuber.com',  phone:'+91 98765 00000' },
 };
 
-// Reliable role lookup by email — works even when RLS blocks DB reads
+// Guaranteed role for known e-mails — bypasses all DB / metadata issues
 const KNOWN_ROLES = {
-  'priya@example.com': 'parent',
+  'priya@example.com':  'parent',
   'suresh@example.com': 'driver',
-  'admin@schuber.com': 'admin',
+  'admin@schuber.com':  'admin',
 };
 
-function resolveRole(dbRole, userMetadata, email) {
-  // 1. DB role is most authoritative
-  if (dbRole) return dbRole;
-  // 2. user_metadata from Supabase Auth
-  if (userMetadata?.role) return userMetadata.role;
-  // 3. Known email mapping (reliable fallback)
-  if (email && KNOWN_ROLES[email.toLowerCase()]) return KNOWN_ROLES[email.toLowerCase()];
-  // 4. Default
+async function fetchProfileRole(userId, email) {
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('role, full_name, phone, avatar_url')
+      .eq('id', userId)
+      .single();
+    if (data?.role) return data;
+  } catch (_) {}
+  return null;
+}
+
+function bestRole(dbRole, metaRole, email) {
+  if (dbRole)   return dbRole;
+  if (metaRole) return metaRole;
+  if (email && KNOWN_ROLES[email?.toLowerCase()]) return KNOWN_ROLES[email.toLowerCase()];
   return 'parent';
 }
 
+// ── Provider ──────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState(null);
-  const [isDemoUser, setIsDemoUser] = useState(false);
+  const [user,      setUser]      = useState(null);
+  const [profile,   setProfile]   = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [isDemoUser,setIsDemoUser]= useState(false);
 
-  // Tracks the profile set by login() — bootstrap must never overwrite this
-  const manualProfileRef = useRef(null);
+  // When login() sets profile, block bootstrap() from overwriting it
+  const loginSetRef = useRef(false);
 
-  const bootstrap = useCallback(async (session) => {
+  // ── Bootstrap: run on page load / auth state change ────────────────────────
+  async function bootstrap(session) {
     try {
-      setAuthError(null);
-
+      // ── No session → check demo localStorage ──────────────────────────────
       if (!session?.user) {
-        // Check for demo session in localStorage
-        const demoSession = localStorage.getItem('schuber-demo-session');
-        if (demoSession) {
+        const raw = localStorage.getItem('schuber-demo-session');
+        if (raw) {
           try {
-            const demo = JSON.parse(demoSession);
+            const demo = JSON.parse(raw);
             setUser({ id: demo.id, email: demo.email });
             setProfile(demo);
             setIsDemoUser(true);
+            return;
           } catch { localStorage.removeItem('schuber-demo-session'); }
-          return;
         }
-        // Only clear state if login() didn't just set it
-        if (!manualProfileRef.current) {
-          setUser(null);
-          setProfile(null);
-        }
+        if (!loginSetRef.current) { setUser(null); setProfile(null); }
         return;
       }
 
-      const currentUser = session.user;
-      setUser(currentUser);
+      // ── We have a real Supabase session ────────────────────────────────────
+      setUser(session.user);
       setIsDemoUser(false);
 
-      // If login() manually set the profile, DON'T overwrite — just use it
-      if (manualProfileRef.current) {
-        console.log('[Auth] bootstrap: using profile set by login()', manualProfileRef.current.role);
-        setProfile(manualProfileRef.current);
+      // If login() already set a correct profile, trust it — skip re-fetch
+      if (loginSetRef.current) {
+        loginSetRef.current = false;
         return;
       }
 
-      // Otherwise, fetch profile from DB
-      let prof = null;
-      try {
-        prof = await getProfile(currentUser.id);
-      } catch (err) {
-        console.warn('[Auth] getProfile failed:', err.message);
-      }
+      // Build profile from DB + metadata
+      const meta   = session.user.user_metadata ?? {};
+      const email  = session.user.email ?? '';
+      const dbProf = await fetchProfileRole(session.user.id, email);
+      const role   = bestRole(dbProf?.role, meta.role, email);
 
-      const role = resolveRole(prof?.role, currentUser.user_metadata, currentUser.email);
-
-      if (prof) {
-        prof = { ...prof, role }; // ensure resolved role
-        if (!prof.avatar_url && currentUser.user_metadata?.avatar_url) {
-          prof = { ...prof, avatar_url: currentUser.user_metadata.avatar_url };
-        }
-        setProfile(prof);
-      } else {
-        // Build profile from metadata
-        setProfile({
-          id: currentUser.id,
-          role,
-          full_name: currentUser.user_metadata?.full_name ?? currentUser.email ?? 'User',
-          email: currentUser.email,
-          avatar_url: currentUser.user_metadata?.avatar_url ?? null,
-          phone: currentUser.user_metadata?.phone ?? null,
-        });
-      }
-    } catch (err) {
-      setAuthError(err?.message ?? 'Authentication error');
+      setProfile({
+        id:         session.user.id,
+        email,
+        role,
+        full_name:  dbProf?.full_name ?? meta.full_name ?? email,
+        phone:      dbProf?.phone     ?? meta.phone     ?? null,
+        avatar_url: dbProf?.avatar_url ?? meta.avatar_url ?? null,
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
+  // ── Initialise on mount ────────────────────────────────────────────────────
   useEffect(() => {
-    // Check demo session first
-    const demoSession = localStorage.getItem('schuber-demo-session');
-    if (demoSession) {
+    // Fast path: demo session already in localStorage
+    const raw = localStorage.getItem('schuber-demo-session');
+    if (raw) {
       try {
-        const demo = JSON.parse(demoSession);
+        const demo = JSON.parse(raw);
         setUser({ id: demo.id, email: demo.email });
         setProfile(demo);
         setIsDemoUser(true);
@@ -122,62 +122,66 @@ export function AuthProvider({ children }) {
       } catch { localStorage.removeItem('schuber-demo-session'); }
     }
 
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) console.error('[Auth] getSession error:', error.message);
+    // Real Supabase session
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => bootstrap(session))
+      .catch(() => setLoading(false));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       bootstrap(session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[Auth] onAuthStateChange:', event);
-      bootstrap(session);
-    });
+    // Safety timeout
+    const t = setTimeout(() => setLoading(false), 6000);
+    return () => { subscription.unsubscribe(); clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    const timeout = setTimeout(() => setLoading(false), 8000);
-    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
-  }, [bootstrap]);
-
-  async function login(email, password) {
-    // Clear any previous manual profile and stale sessions
-    manualProfileRef.current = null;
+  // ── login() ────────────────────────────────────────────────────────────────
+  async function login(emailRaw, password) {
+    const email = emailRaw?.trim().toLowerCase();
+    loginSetRef.current = false;
     localStorage.removeItem('schuber-demo-session');
 
-    // Try real Supabase login first
+    // ── 1. Try real Supabase auth ──────────────────────────────────────────
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (!error && data?.user) {
-        const prof = await getProfile(data.user.id).catch(() => null);
-        const role = resolveRole(prof?.role, data.user.user_metadata, email);
+        const meta   = data.user.user_metadata ?? {};
+        const dbProf = await fetchProfileRole(data.user.id, email);
+        const role   = bestRole(dbProf?.role, meta.role, email);
 
-        const fullProfile = prof
-          ? { ...prof, role }
-          : {
-              id: data.user.id, role, email: data.user.email,
-              full_name: data.user.user_metadata?.full_name ?? data.user.email,
-              avatar_url: data.user.user_metadata?.avatar_url ?? null,
-              phone: data.user.user_metadata?.phone ?? null,
-            };
+        const fullProfile = {
+          id:         data.user.id,
+          email,
+          role,
+          full_name:  dbProf?.full_name ?? meta.full_name ?? email,
+          phone:      dbProf?.phone     ?? meta.phone     ?? null,
+          avatar_url: dbProf?.avatar_url ?? meta.avatar_url ?? null,
+        };
 
-        console.log('[Auth] login success:', email, '→ role:', role);
+        console.log('[Auth] ✅ login:', email, '→ role:', role);
 
-        // Store in ref so bootstrap doesn't overwrite
-        manualProfileRef.current = fullProfile;
+        loginSetRef.current = true;       // block bootstrap from overwriting
         setUser(data.user);
         setProfile(fullProfile);
         setIsDemoUser(false);
         setLoading(false);
         return { ...data.user, role };
       }
+      // If Supabase returned an error, fall through to demo
+      console.warn('[Auth] Supabase login error:', error?.message);
     } catch (e) {
-      console.warn('[Auth] Supabase login failed, trying demo:', e.message);
+      console.warn('[Auth] Supabase unreachable:', e.message);
     }
 
-    // Fallback: demo accounts
-    const demo = DEMO_ACCOUNTS[email?.toLowerCase()];
+    // ── 2. Demo account fallback ───────────────────────────────────────────
+    const demo = DEMO_ACCOUNTS[email];
     if (demo && demo.password === password) {
+      console.log('[Auth] 🎭 demo login:', email, '→ role:', demo.role);
       const demoProfile = { ...demo };
-      console.log('[Auth] demo login:', email, '→ role:', demo.role);
       localStorage.setItem('schuber-demo-session', JSON.stringify(demoProfile));
-      manualProfileRef.current = demoProfile;
+      loginSetRef.current = true;
       setUser({ id: demo.id, email: demo.email });
       setProfile(demoProfile);
       setIsDemoUser(true);
@@ -185,9 +189,10 @@ export function AuthProvider({ children }) {
       return { ...demo, role: demo.role };
     }
 
-    throw new Error('Invalid email or password. Please check your credentials and try again.');
+    throw new Error('Invalid email or password.');
   }
 
+  // ── register() ─────────────────────────────────────────────────────────────
   async function register(email, password, fullName, role = 'parent', phone = '') {
     const { data, error } = await supabase.auth.signUp({
       email, password,
@@ -199,21 +204,21 @@ export function AuthProvider({ children }) {
     if (error) throw error;
 
     if (data.user) {
-      await supabase.from('profiles').upsert(
-        { id: data.user.id, role, full_name: fullName, email, phone },
-        { onConflict:'id' }
-      ).catch(e => console.error('[Auth] Profile upsert failed:', e.message));
+      // Upsert profile row
+      await supabase.from('profiles')
+        .upsert({ id: data.user.id, role, full_name: fullName, email, phone }, { onConflict: 'id' })
+        .catch(e => console.warn('[Auth] profile upsert:', e.message));
 
+      // Auto-create driver record
       if (role === 'driver') {
-        await supabase.from('drivers').insert({
-          user_id: data.user.id,
-          verified: false, is_online: false, rating: 0, capacity: 12,
-        }).catch(e => console.error('[Auth] Driver insert failed:', e.message));
+        await supabase.from('drivers')
+          .insert({ user_id: data.user.id, verified: false, is_online: false, rating: 0, capacity: 12 })
+          .catch(e => console.warn('[Auth] driver insert:', e.message));
       }
 
       if (data.session) {
         const prof = { id: data.user.id, role, full_name: fullName, email, phone };
-        manualProfileRef.current = prof;
+        loginSetRef.current = true;
         setUser(data.user);
         setProfile(prof);
         setLoading(false);
@@ -223,47 +228,50 @@ export function AuthProvider({ children }) {
     return data.user;
   }
 
+  // ── logout() ───────────────────────────────────────────────────────────────
   async function logout() {
-    manualProfileRef.current = null;
+    loginSetRef.current = false;
     localStorage.removeItem('schuber-demo-session');
     setUser(null);
     setProfile(null);
     setIsDemoUser(false);
-    if (!isDemoUser) {
-      await signOut().catch(() => {});
-    }
+    if (!isDemoUser) await signOut().catch(() => {});
   }
 
   async function getAuthHeader() {
-    if (isDemoUser) return { 'X-Demo-User': profile?.id || 'demo', 'X-Demo-Role': profile?.role || 'parent', 'Content-Type':'application/json' };
+    if (isDemoUser) {
+      return {
+        'Content-Type':   'application/json',
+        'X-Demo-Role':    profile?.role || 'parent',
+        'X-Demo-User':    profile?.id   || 'demo',
+      };
+    }
     const { data: { session } } = await supabase.auth.getSession();
-    return session ? { Authorization:`Bearer ${session.access_token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' };
+    return session
+      ? { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }
+      : { 'Content-Type': 'application/json' };
   }
 
   async function refreshProfile() {
     if (isDemoUser || !user) return;
-    try { const prof = await getProfile(user.id); if (prof) setProfile(prof); }
-    catch (err) { console.error('[Auth] refreshProfile error:', err); }
+    const dbProf = await fetchProfileRole(user.id, user.email).catch(() => null);
+    if (dbProf) setProfile(p => ({ ...p, ...dbProf }));
   }
 
-  const value = {
-    user, profile,
-    role: profile?.role ?? null,
-    loading, authError,
-    isDemoUser,
-    login, register,
-    signOut: logout, logout,
-    signInWithGoogle,
-    getAuthHeader,
-    refreshProfile,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user, profile,
+      role: profile?.role ?? null,
+      loading, isDemoUser,
+      login, register,
+      logout, signOut: logout,
+      signInWithGoogle,
+      getAuthHeader, refreshProfile,
+    }}>
       {loading ? (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1rem' }}>
           <div style={{ width:40, height:40, border:'3px solid #FDE68A', borderTopColor:'#F59E0B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
           <div style={{ color:'#D97706', fontWeight:600, fontFamily:'DM Sans,sans-serif' }}>Loading Schuber…</div>
         </div>
       ) : children}
