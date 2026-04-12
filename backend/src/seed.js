@@ -10,7 +10,8 @@ const TABLES_SQL = `
 -- profiles (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  role TEXT DEFAULT 'parent' CHECK (role IN ('parent','driver','admin')),
+  role TEXT CHECK (role IN ('parent','driver','admin')),
+
   full_name TEXT,
   email TEXT,
   phone TEXT,
@@ -127,8 +128,9 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'parent')
+    NEW.raw_user_meta_data->>'role'
   )
+
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;

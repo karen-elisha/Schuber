@@ -112,7 +112,9 @@ export function AuthProvider({ children }) {
       const dbProf      = await fetchProfileRole(session.user.id, email);
 
       const pendingRole = localStorage.getItem('schuber-pending-role');
+      console.log('[Auth] 🔍 Bootstrap:', { email, dbProf: dbProf?.role, pendingRole });
       localStorage.removeItem('schuber-pending-role');
+
 
       // ── RULE 1: Admin-only email enforcement ──────────────────────────────
       // karenelisha0204@gmail.com is ALWAYS admin.
@@ -130,10 +132,10 @@ export function AuthProvider({ children }) {
       } else if (existingRole && existingRole !== 'admin') {
         // Existing parent/driver — their DB role wins, ignore pendingRole
         if (pendingRole && pendingRole !== existingRole) {
-          // They tried to sign in as a different role — sign them out and block
-          console.warn(`[Auth] 🚫 Role conflict: account is '${existingRole}', tried '${pendingRole}'`);
+          console.warn(`[Auth] 🚫 ROLE CONFLICT: This account is already a '${existingRole}'. You tried to sign in as '${pendingRole}'.`);
           localStorage.setItem('schuber-role-conflict', `This account is registered as a ${existingRole}. Please sign in as ${existingRole}.`);
           await signOut().catch(() => {});
+
           setUser(null); setProfile(null); setLoading(false);
           return;
         }

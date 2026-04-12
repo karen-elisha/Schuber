@@ -38,6 +38,7 @@ function ProtectedRoute({ children, roles }) {
     return <Navigate to="/driver-verification" replace />;
   }
 
+
   return children;
 }
 
@@ -61,9 +62,9 @@ function AppRoutes() {
               ? <Navigate to="/driver-verification" replace />
               : <Navigate to={`/${profile.role}`} replace />)
           : <LandingPage />
+
       } />
 
-      {/* AUTH */}
       <Route path="/login" element={
         user && profile?.role ? (
           profile.role === 'driver' && !profile.has_driver_profile 
@@ -78,6 +79,8 @@ function AppRoutes() {
             : <Navigate to={`/${profile.role}`} replace />
         ) : <RegisterPage />
       } />
+
+
 
       {/* PUBLIC */}
       <Route path="/driver-verification" element={<DriverVerificationPage />} />

@@ -98,11 +98,21 @@ function DriverHome() {
         )}
       </div>
 
-      {!driverInfo?.verified && (
+      {!driverInfo && (
+        <div style={{ background:C.redBg, border:`1.5px solid ${C.red}`, borderRadius:12, padding:'1rem 1.25rem', color:C.red, fontSize:'0.875rem', fontWeight:600, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>⚠️ You haven't completed your driver profile yet.</div>
+          <button onClick={() => window.location.href='/driver-verification'} style={{ background:C.red, color:'#fff', border:'none', padding:'0.4rem 1rem', borderRadius:8, fontWeight:700, cursor:'pointer' }}>
+            Complete Setup Now →
+          </button>
+        </div>
+      )}
+
+      {driverInfo && !driverInfo.verified && (
         <div style={{ background:'#FEF3C7', border:`1.5px solid ${C.border}`, borderRadius:12, padding:'0.875rem 1.25rem', color:'#92400E', fontSize:'0.875rem', fontWeight:500 }}>
           ⏳ Your account is pending verification by the admin. Some features may be limited.
         </div>
       )}
+
 
       <div style={s.statsGrid}>
         <StatCard icon="🎒" label="Assigned Students" value={loading ? '…' : students.length} sub="On your route" />
