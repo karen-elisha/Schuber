@@ -4,68 +4,70 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { signInWithGoogle } from '../supabase';
 
-const DEMOS = [
+const ROLES = [
   {
-    role: 'parent',
-    icon: '👨‍👩‍👧',
-    label: 'Parent',
-    email: 'priya@example.com',
-    password: 'parent123',
-    desc: 'Live tracking, children & alerts',
-    color: '#059669',
-    bg: '#DCFCE7',
-    border: '#A7F3D0',
+    id:       'parent',
+    icon:     '👨‍👩‍👧',
+    label:    'Parent',
+    color:    '#059669',
+    bg:       '#DCFCE7',
+    border:   '#6EE7B7',
+    desc:     'Track your child\'s commute',
+    demo:     { email:'priya@example.com', password:'parent123' },
   },
   {
-    role: 'driver',
-    icon: '🚌',
-    label: 'Driver',
-    email: 'suresh@example.com',
-    password: 'driver123',
-    desc: 'Trip management & attendance',
-    color: '#2563EB',
-    bg: '#EFF6FF',
-    border: '#BFDBFE',
+    id:       'driver',
+    icon:     '🚌',
+    label:    'Driver',
+    color:    '#2563EB',
+    bg:       '#EFF6FF',
+    border:   '#93C5FD',
+    desc:     'Manage trips & students',
+    demo:     { email:'suresh@example.com', password:'driver123' },
   },
   {
-    role: 'admin',
-    icon: '🛡️',
-    label: 'Admin',
-    email: 'admin@schuber.com',
-    password: 'admin123',
-    desc: 'Full fleet & operations control',
-    color: '#7C3AED',
-    bg: '#EDE9FE',
-    border: '#C4B5FD',
+    id:       'admin',
+    icon:     '🛡️',
+    label:    'Admin',
+    color:    '#7C3AED',
+    bg:       '#EDE9FE',
+    border:   '#C4B5FD',
+    desc:     'Fleet & operations control',
+    demo:     { email:'admin@schuber.com', password:'admin123' },
   },
 ];
 
 export default function LoginPage() {
   const { login }   = useAuth();
   const navigate    = useNavigate();
-  const [error, setError]             = useState('');
-  const [demoLoading, setDemoLoading] = useState(null);
+
+  const [selectedRole, setSelectedRole] = useState('parent');
+  const [demoLoading, setDemoLoading]   = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError]               = useState('');
+
+  const role = ROLES.find(r => r.id === selectedRole);
 
   const handleGoogle = async () => {
     setError(''); setGoogleLoading(true);
     try {
-      await signInWithGoogle(); // role defaults to 'parent'; returning users keep their DB role
+      await signInWithGoogle(selectedRole);
     } catch {
       setError('Google sign-in failed. Please try again.');
       setGoogleLoading(false);
     }
   };
 
-  const loginAsDemo = async (d) => {
-    setDemoLoading(d.role); setError('');
+  const handleDemo = async () => {
+    if (!role) return;
+    setDemoLoading(true); setError('');
     try {
-      const user = await login(d.email, d.password);
-      navigate(`/${user?.role ?? d.role}`, { replace: true });
+      const user = await login(role.demo.email, role.demo.password);
+      navigate(`/${user?.role ?? role.id}`, { replace: true });
     } catch {
-      navigate(`/${d.role}`, { replace: true }); // graceful fallback
+      navigate(`/${role.id}`, { replace: true });
     } finally {
-      setDemoLoading(null);
+      setDemoLoading(false);
     }
   };
 
@@ -74,24 +76,61 @@ export default function LoginPage() {
       <style>{`
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .role-tab:hover  { opacity: 0.85; }
         .goog-btn:hover:not(:disabled) { box-shadow: 0 4px 18px rgba(0,0,0,0.12) !important; transform: translateY(-1px); }
-        .demo-card:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.08) !important; }
+        .demo-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
       `}</style>
 
-      {/* Left: Login card */}
+      {/* Left */}
       <div style={s.left}>
         <div style={s.card}>
+
           <Link to="/" style={s.logo}>🚌 <span style={{ color:'#F59E0B' }}>Schu</span>ber</Link>
 
           <h1 style={s.heading}>Welcome back</h1>
-          <p style={s.sub}>Sign in to track your child's school commute</p>
+          <p style={s.sub}>Sign in to continue</p>
+
+          {/* Role selector tabs */}
+          <p style={s.roleLabel}>I am a:</p>
+          <div style={s.roleRow}>
+            {ROLES.map(r => (
+              <button key={r.id} className="role-tab"
+                onClick={() => { setSelectedRole(r.id); setError(''); }}
+                style={{
+                  ...s.roleTab,
+                  background:   selectedRole === r.id ? r.bg         : '#fff',
+                  border:       selectedRole === r.id ? `2px solid ${r.border}` : '1.5px solid #E5E7EB',
+                  color:        selectedRole === r.id ? r.color       : '#78716C',
+                }}>
+                <span style={{ fontSize:'1.25rem' }}>{r.icon}</span>
+                <span style={{ fontWeight: selectedRole === r.id ? 800 : 600 }}>{r.label}</span>
+                {selectedRole === r.id && (
+                  <span style={{ ...s.activeCheck, background: r.color }}>✓</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Context box for chosen role */}
+          <div style={{ ...s.contextBox, borderColor: role?.border, background: role?.bg }}>
+            <span style={{ fontSize:'1.3rem' }}>{role?.icon}</span>
+            <div>
+              <div style={{ fontWeight:700, color: role?.color, fontSize:'0.88rem' }}>
+                Signing in as {role?.label}
+              </div>
+              <div style={{ fontSize:'0.75rem', color:'#57534E', marginTop:'0.1rem' }}>
+                {role?.desc}
+              </div>
+            </div>
+          </div>
 
           {error && <div style={s.errorBox}>⚠️ {error}</div>}
 
           {/* Google Sign In */}
-          <button className="goog-btn" onClick={handleGoogle} disabled={googleLoading || !!demoLoading} style={s.googleBtn}>
+          <button className="goog-btn" onClick={handleGoogle}
+            disabled={googleLoading || demoLoading} style={s.googleBtn}>
             {googleLoading
-              ? <span style={{ ...s.spinner, borderColor:'rgba(0,0,0,0.08)', borderTopColor:'#F59E0B' }} />
+              ? <span style={{ ...s.spinner, borderColor:'rgba(0,0,0,0.1)', borderTopColor:'#F59E0B' }} />
               : <svg width="20" height="20" viewBox="0 0 48 48" style={{ flexShrink:0 }}>
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -100,49 +139,41 @@ export default function LoginPage() {
                 </svg>
             }
             <span style={{ flex:1, textAlign:'center' }}>
-              {googleLoading ? 'Connecting…' : 'Continue with Google'}
+              {googleLoading ? 'Connecting…' : `Sign in as ${role?.label} with Google`}
             </span>
           </button>
 
           {/* Divider */}
           <div style={s.divider}>
             <div style={s.divLine} />
-            <span style={s.divTxt}>or try a demo account</span>
+            <span style={s.divTxt}>or use demo account</span>
             <div style={s.divLine} />
           </div>
 
-          {/* Demo Role Cards — Parent, Driver, Admin */}
-          <div style={s.demoGrid}>
-            {DEMOS.map(d => (
-              <button key={d.role} className="demo-card"
-                onClick={() => loginAsDemo(d)}
-                disabled={!!demoLoading || googleLoading}
-                style={{ ...s.demoCard, borderColor: d.border }}>
-                {demoLoading === d.role ? (
-                  <span style={{ ...s.spinner, borderColor:'rgba(0,0,0,0.1)', borderTopColor: d.color, margin:'auto' }} />
-                ) : (
-                  <>
-                    <div style={{ ...s.demoIconWrap, background: d.bg }}>
-                      <span style={{ fontSize:'1.5rem' }}>{d.icon}</span>
-                    </div>
-                    <div style={s.demoInfo}>
-                      <div style={{ ...s.demoLabel, color: d.color }}>{d.label}</div>
-                      <div style={s.demoDesc}>{d.desc}</div>
-                    </div>
-                    <div style={{ ...s.demoArrow, color: d.color }}>→</div>
-                  </>
-                )}
-              </button>
-            ))}
+          {/* Demo quick-login */}
+          <button className="demo-btn" onClick={handleDemo}
+            disabled={demoLoading || googleLoading}
+            style={{ ...s.demoBtn, background: role?.color, boxShadow:`0 4px 14px ${role?.color}40` }}>
+            {demoLoading
+              ? <span style={s.spinner} />
+              : <span style={{ fontSize:'1.1rem' }}>{role?.icon}</span>
+            }
+            <span style={{ flex:1, textAlign:'center' }}>
+              {demoLoading ? 'Signing in…' : `Try ${role?.label} Demo`}
+            </span>
+          </button>
+
+          <div style={s.demoHint}>
+            Demo: <code style={s.demoCode}>{role?.demo.email}</code>
           </div>
 
           <p style={s.register}>
-            New to Schuber? <Link to="/register" style={s.link}>Create account →</Link>
+            New to Schuber? <Link to="/register" style={s.link}>Create an account →</Link>
           </p>
         </div>
       </div>
 
-      {/* Right: Hero */}
+      {/* Right: hero */}
       <div style={s.right}>
         <div style={s.rightInner}>
           <div style={s.badge}>🔒 Trusted by 12,000+ families</div>
@@ -150,13 +181,13 @@ export default function LoginPage() {
           <p style={s.heroSub}>Real-time GPS · Instant alerts · Verified drivers</p>
           <div style={s.features}>
             {[
-              ['📍', 'Live GPS tracking every 30 seconds'],
-              ['🔔', 'Instant boarding & drop-off alerts'],
-              ['🚌', 'Background-checked, verified drivers'],
-              ['🆘', 'One-tap SOS emergency alert'],
-              ['📊', 'Full trip history & attendance'],
-              ['🤖', 'AI assistant for instant answers'],
-            ].map(([icon, txt]) => (
+              ['📍','Live GPS every 30 seconds'],
+              ['🔔','Instant boarding & drop-off alerts'],
+              ['🚌','Background-checked, verified drivers'],
+              ['🆘','One-tap SOS emergency alert'],
+              ['📊','Full trip history & attendance'],
+              ['🤖','AI assistant for instant answers'],
+            ].map(([icon,txt]) => (
               <div key={txt} style={s.feature}>
                 <span style={s.fIcon}>{icon}</span>
                 <span style={s.fTxt}>{txt}</span>
@@ -182,24 +213,24 @@ const s = {
   left:       { flex:'1 1 480px', display:'flex', alignItems:'center', justifyContent:'center', padding:'2.5rem 2rem', overflowY:'auto' },
   card:       { width:'100%', maxWidth:440, animation:'fadeUp 0.4s ease' },
   logo:       { display:'block', fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:'1.4rem', color:'#1C1917', textDecoration:'none', marginBottom:'1.75rem' },
-  heading:    { fontFamily:"'Syne',sans-serif", fontSize:'1.75rem', fontWeight:800, color:'#1C1917', margin:'0 0 0.35rem' },
+  heading:    { fontFamily:"'Syne',sans-serif", fontSize:'1.75rem', fontWeight:800, color:'#1C1917', margin:'0 0 0.25rem' },
   sub:        { color:'#78716C', fontSize:'0.92rem', margin:'0 0 1.5rem' },
+  roleLabel:  { fontSize:'0.72rem', color:'#57534E', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', margin:'0 0 0.6rem' },
+  roleRow:    { display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.5rem', marginBottom:'1rem' },
+  roleTab:    { position:'relative', display:'flex', flexDirection:'column', alignItems:'center', gap:'0.3rem', padding:'0.75rem 0.5rem', borderRadius:12, cursor:'pointer', transition:'all 0.18s', fontFamily:"'DM Sans',sans-serif", fontSize:'0.85rem' },
+  activeCheck:{ position:'absolute', top:6, right:6, width:18, height:18, color:'#fff', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.62rem', fontWeight:900 },
+  contextBox: { display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.75rem 1rem', borderRadius:10, border:'1.5px solid', marginBottom:'1.1rem', transition:'all 0.2s' },
   errorBox:   { background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', padding:'0.7rem 1rem', borderRadius:10, fontSize:'0.85rem', marginBottom:'1rem' },
-  googleBtn:  { width:'100%', display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.9rem 1.25rem', background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:12, fontSize:'0.95rem', fontWeight:700, color:'#1C1917', cursor:'pointer', boxShadow:'0 2px 8px rgba(0,0,0,0.06)', transition:'all 0.2s', fontFamily:"'DM Sans',sans-serif", marginBottom:'1.25rem' },
+  googleBtn:  { width:'100%', display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.9rem 1.25rem', background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:12, fontSize:'0.93rem', fontWeight:700, color:'#1C1917', cursor:'pointer', boxShadow:'0 2px 8px rgba(0,0,0,0.06)', transition:'all 0.2s', fontFamily:"'DM Sans',sans-serif", marginBottom:'1.1rem' },
   divider:    { display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1rem' },
   divLine:    { flex:1, height:1, background:'#E5E7EB' },
   divTxt:     { color:'#9CA3AF', fontSize:'0.72rem', whiteSpace:'nowrap', fontWeight:500 },
-  demoGrid:   { display:'flex', flexDirection:'column', gap:'0.5rem', marginBottom:'1.5rem' },
-  demoCard:   { width:'100%', display:'flex', alignItems:'center', gap:'0.875rem', padding:'0.75rem 1rem', background:'#fff', border:'1.5px solid #E5E7EB', borderRadius:12, cursor:'pointer', transition:'all 0.2s', fontFamily:"'DM Sans',sans-serif", minHeight:62 },
-  demoIconWrap:{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
-  demoInfo:   { flex:1, textAlign:'left' },
-  demoLabel:  { fontWeight:800, fontSize:'0.9rem', marginBottom:'0.1rem' },
-  demoDesc:   { fontSize:'0.72rem', color:'#78716C' },
-  demoArrow:  { fontSize:'1.1rem', fontWeight:700, flexShrink:0 },
+  demoBtn:    { width:'100%', display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.9rem 1.25rem', color:'#fff', border:'none', borderRadius:12, fontSize:'0.93rem', fontWeight:700, cursor:'pointer', transition:'all 0.2s', fontFamily:"'DM Sans',sans-serif", marginBottom:'0.6rem' },
+  demoHint:   { textAlign:'center', color:'#9CA3AF', fontSize:'0.72rem', marginBottom:'1.25rem' },
+  demoCode:   { background:'#F5F5F4', padding:'0.1rem 0.4rem', borderRadius:4, fontSize:'0.7rem', color:'#57534E' },
   register:   { color:'#78716C', fontSize:'0.875rem', textAlign:'center', margin:0 },
   link:       { color:'#D97706', fontWeight:700, textDecoration:'none' },
-  spinner:    { display:'inline-block', width:18, height:18, border:'2.5px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.7s linear infinite', flexShrink:0 },
-  // Right panel
+  spinner:    { display:'inline-block', width:18, height:18, border:'2.5px solid rgba(255,255,255,0.35)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.7s linear infinite', flexShrink:0 },
   right:      { flex:'0 0 420px', background:'linear-gradient(160deg,#D97706 0%,#92400E 100%)', display:'flex', alignItems:'center', justifyContent:'center', padding:'3rem 2.5rem' },
   rightInner: { width:'100%' },
   badge:      { display:'inline-block', background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.3)', color:'#fff', borderRadius:20, padding:'0.3rem 0.9rem', fontSize:'0.72rem', fontWeight:700, marginBottom:'1.5rem' },
