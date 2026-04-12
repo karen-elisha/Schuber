@@ -37,12 +37,22 @@ const KNOWN_ROLES = {
 
 async function fetchProfileRole(userId, email) {
   try {
-    const { data } = await supabase
+    const { data: profile } = await supabase
       .from('profiles')
       .select('role, full_name, phone, avatar_url')
       .eq('id', userId)
       .single();
-    if (data?.role) return data;
+    
+    if (profile?.role === 'driver') {
+      const { data: driver } = await supabase
+        .from('drivers')
+        .select('id, verified')
+        .eq('user_id', userId)
+        .maybeSingle();
+      return { ...profile, driver_profile_exists: !!driver, is_verified: driver?.verified ?? false };
+    }
+    
+    if (profile?.role) return profile;
   } catch (_) {}
   return null;
 }
@@ -174,6 +184,8 @@ export function AuthProvider({ children }) {
         full_name:  dbProf?.full_name ?? meta.full_name ?? email,
         phone:      dbProf?.phone     ?? meta.phone     ?? null,
         avatar_url: dbProf?.avatar_url ?? meta.avatar_url ?? null,
+        has_driver_profile: dbProf?.driver_profile_exists ?? false,
+        is_verified: dbProf?.is_verified ?? false,
       });
     } finally {
       setLoading(false);

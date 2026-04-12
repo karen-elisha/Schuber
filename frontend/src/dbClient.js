@@ -6,7 +6,8 @@
  *       This module reads directly from Supabase using the anon key,
  *       subject only to RLS policies (which allow users to read their own rows).
  *
- *       Write operations still go through the backend (for business logic).
+ *       This module reads and writes directly from Supabase using the anon key,
+ *       subject only to RLS policies (which allow users to read/write their own rows).
  */
 
 import { supabase } from './supabase';
@@ -69,6 +70,16 @@ export async function getMyNotifications(userId) {
     .limit(30);
   if (error) throw error;
   return data || [];
+}
+
+/** Create a new student record */
+export async function addStudent(studentData) {
+  const { data, error } = await q('students')
+    .insert([studentData])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 // ── Drivers ───────────────────────────────────────────────────────────────────
@@ -201,4 +212,14 @@ export async function getAllTrips() {
     driver_name: t.drivers?.profiles?.full_name,
     vehicle_no:  t.drivers?.vehicle_no,
   }));
+}
+/** Assign a student to a driver */
+export async function assignStudentToDriver(studentId, driverId) {
+  const { data, error } = await q('students')
+    .update({ driver_id: driverId })
+    .eq('id', studentId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }

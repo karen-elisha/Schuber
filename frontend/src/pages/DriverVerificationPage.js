@@ -9,7 +9,7 @@ const STEPS = ['Vehicle Details','License & Experience','Upload Documents','Conf
 
 export default function DriverVerificationPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const dlRef  = useRef();
   const rcRef  = useRef();
   const picRef = useRef();
@@ -116,9 +116,10 @@ export default function DriverVerificationPage() {
 
       if (error) throw error;
 
-      localStorage.removeItem('schuber-driver-setup'); // clear setup flag
-      setDone(true);
-      setTimeout(() => navigate('/driver', { replace: true }), 2500);
+        localStorage.removeItem("schuber-driver-setup");
+        await refreshProfile().catch(() => {});
+       setDone(true);
+       setTimeout(() => navigate('/driver', { replace: true }), 2500);
     } catch (err) {
       setErrors({ submit: err.message || 'Failed to save. Please try again.' });
     } finally {

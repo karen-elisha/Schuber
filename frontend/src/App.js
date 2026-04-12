@@ -33,6 +33,11 @@ function ProtectedRoute({ children, roles }) {
     return <Navigate to={`/${profile.role}`} replace />;
   }
 
+  // ✅ DRIVER SETUP CHECK — redirect if driver profile missing
+  if (profile?.role === 'driver' && !profile.has_driver_profile) {
+    return <Navigate to="/driver-verification" replace />;
+  }
+
   return children;
 }
 
@@ -52,7 +57,7 @@ function AppRoutes() {
       {/* HOME */}
       <Route path="/" element={
         user && profile?.role
-          ? (profile.role === 'driver' && localStorage.getItem('schuber-driver-setup')
+          ? (profile.role === 'driver' && !profile.has_driver_profile
               ? <Navigate to="/driver-verification" replace />
               : <Navigate to={`/${profile.role}`} replace />)
           : <LandingPage />
@@ -60,10 +65,18 @@ function AppRoutes() {
 
       {/* AUTH */}
       <Route path="/login" element={
-        user && profile?.role ? <Navigate to={`/${profile.role}`} replace /> : <LoginPage />
+        user && profile?.role ? (
+          profile.role === 'driver' && !profile.has_driver_profile 
+            ? <Navigate to="/driver-verification" replace />
+            : <Navigate to={`/${profile.role}`} replace />
+        ) : <LoginPage />
       } />
       <Route path="/register" element={
-        user && profile?.role ? <Navigate to={`/${profile.role}`} replace /> : <RegisterPage />
+        user && profile?.role ? (
+          profile.role === 'driver' && !profile.has_driver_profile 
+            ? <Navigate to="/driver-verification" replace />
+            : <Navigate to={`/${profile.role}`} replace />
+        ) : <RegisterPage />
       } />
 
       {/* PUBLIC */}

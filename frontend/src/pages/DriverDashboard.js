@@ -10,22 +10,6 @@ import { getDriverProfile, getAssignedStudents, getDriverTrips } from '../dbClie
 
 const C = { primary:'#F59E0B', dark:'#D97706', light:'#FEF3C7', ultraLight:'#FFFBEB', border:'#FDE68A', text:'#1C1917', text2:'#57534E', text3:'#A8A29E', white:'#FFFFFF', green:'#059669', greenBg:'#DCFCE7', red:'#DC2626', redBg:'#FEF2F2', blue:'#2563EB', blueBg:'#EFF6FF' };
 
-const DUMMY_DRIVER = { id:1, name:'Suresh Kumar', email:'suresh@example.com', phone:'+91 98765 43210', status:'online', verified:true, rating:4.8, vehicle_no:'KA01AB1234', vehicle_model:'Tempo Traveller 2022', license_no:'KA0120230012345', capacity:12, route:'Koramangala - Indiranagar - DPS Whitefield' };
-const DUMMY_STUDENTS = [
-  { id:1, name:'Aanya Sharma', school:'DPS Whitefield', grade:'Grade 5', pickup_address:'12 Rose Garden, Koramangala', parent_name:'Priya Sharma', parent_phone:'+91 98765 11111' },
-  { id:2, name:'Rohan Mehta', school:'DPS Whitefield', grade:'Grade 3', pickup_address:'45 Indiranagar 4th Cross', parent_name:'Vikram Mehta', parent_phone:'+91 98765 22222' },
-  { id:3, name:'Sia Nair', school:'DPS Whitefield', grade:'Grade 7', pickup_address:'8 Jayanagar 5th Block', parent_name:'Anjali Nair', parent_phone:'+91 98765 33333' },
-];
-const DUMMY_TRIPS = [
-  { id:101, date:'2024-06-12', route:'Morning Route A', status:'completed', started_at:'2024-06-12T07:30:00', ended_at:'2024-06-12T08:15:00', students_count:3 },
-  { id:100, date:'2024-06-11', route:'Morning Route A', status:'completed', started_at:'2024-06-11T07:32:00', ended_at:'2024-06-11T08:18:00', students_count:3 },
-  { id:99, date:'2024-06-10', route:'Morning Route A', status:'completed', started_at:'2024-06-10T07:28:00', ended_at:'2024-06-10T08:12:00', students_count:2 },
-];
-const DUMMY_PENALTIES = [
-  { id:1, type:'Late Pickup', date:'2024-06-08', amount:'₹50', description:'Pickup was 18 minutes late at Koramangala stop', status:'applied' },
-  { id:2, type:'Missed Pickup', date:'2024-06-05', amount:'₹200', description:'Student Rohan Mehta was not picked up. Parent filed complaint.', status:'resolved' },
-];
-
 const navItems = [
   { path:'/driver', end:true, icon:'🏠', label:'Dashboard' },
   { path:'/driver/trip', icon:'🚌', label:'Current Trip' },
@@ -214,7 +198,7 @@ function DriverTrip() {
       await api.post('/trips/start', { route: 'Morning Route A' });
       await refresh();
       flash('✅ Trip started! Students will be notified.');
-    } catch { flash('⚠️ Could not start trip — showing demo mode.'); setActiveTrip({ id: Date.now(), route:'Morning Route A', status:'active', students: DUMMY_STUDENTS.map(st => ({...st, student_id:st.id, checked_in:false, checked_out:false})) }); }
+    } catch { flash('⚠️ Could not start trip — please check connection.'); }
     setStarting(false);
   };
 
@@ -489,11 +473,15 @@ function DriverStudents() {
 
 // ── History ───────────────────────────────────────────────────────────────────
 function DriverHistory() {
-  const [trips, setTrips] = useState(DUMMY_TRIPS);
+  const { user } = useAuth();
+  const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    api.get('/trips').then(d => { if(Array.isArray(d)&&d.length) setTrips(d); }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+    if (!user?.id) return;
+    getDriverProfile(user.id).then(d => {
+      if (d?.id) getDriverTrips(d.id).then(setTrips);
+    }).finally(() => setLoading(false));
+  }, [user?.id]);
   const sc = { in_progress:C.green, completed:C.text3, scheduled:C.primary, cancelled:C.red };
   const total = trips.length;
   const done = trips.filter(t=>t.status==='completed').length;
@@ -529,7 +517,7 @@ function DriverHistory() {
 
 // ── Penalties ─────────────────────────────────────────────────────────────────
 function DriverPenalties() {
-  const [penalties] = useState(DUMMY_PENALTIES);
+  const [penalties] = useState([]);
   const total = penalties.reduce((sum,p) => sum+parseInt(p.amount.replace('₹','').replace(',','')),0);
   const statusColor = { applied:C.red, resolved:C.green };
   return (
@@ -579,7 +567,7 @@ function DriverProfile() {
         setForm({ license_no:d.license_no||'', vehicle_no:d.vehicle_no||'', vehicle_model:d.vehicle_model||'', capacity:d.capacity||'', route:d.route||'', phone:d.phone||d.profiles?.phone||'' });
       }
     }).catch(() => {
-      setForm({ license_no:DUMMY_DRIVER.license_no, vehicle_no:DUMMY_DRIVER.vehicle_no, vehicle_model:DUMMY_DRIVER.vehicle_model, capacity:DUMMY_DRIVER.capacity, route:DUMMY_DRIVER.route, phone:DUMMY_DRIVER.phone });
+      setForm({ license_no:'', vehicle_no:'', vehicle_model:'', capacity:'', route:'', phone:'' });
     });
   }, []);
 

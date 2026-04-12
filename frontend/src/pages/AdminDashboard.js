@@ -8,31 +8,6 @@ import { getAllDrivers, getAllStudents, getAllTrips } from '../dbClient';
 
 const C = { primary:'#F59E0B', dark:'#D97706', light:'#FEF3C7', ultraLight:'#FFFBEB', border:'#FDE68A', text:'#1C1917', text2:'#57534E', text3:'#A8A29E', white:'#FFFFFF', green:'#059669', greenBg:'#DCFCE7', red:'#DC2626', redBg:'#FEF2F2', blue:'#2563EB', blueBg:'#EFF6FF' };
 
-const DUMMY_DRIVERS = [
-  { id:1, name:'Suresh Kumar', email:'suresh@example.com', vehicle_no:'KA01AB1234', route:'Koramangala → DPS', status:'on_trip', verified:true, rating:4.8, lat:12.9388, lng:77.6285 },
-  { id:2, name:'Ravi Shankar', email:'ravi@example.com', vehicle_no:'KA02CD5678', route:'Jayanagar → Ryan', status:'online', verified:true, rating:4.5, lat:12.9250, lng:77.6050 },
-  { id:3, name:'Mohan Das', email:'mohan@example.com', vehicle_no:'KA03EF9012', route:'HSR → Inventure', status:'offline', verified:false, rating:4.1, lat:12.9100, lng:77.6400 },
-];
-const DUMMY_TRIPS = [
-  { id:101, driver_name:'Suresh Kumar', vehicle_no:'KA01AB1234', route:'Koramangala → DPS', status:'in_progress', date:'2024-06-12' },
-  { id:100, driver_name:'Ravi Shankar', vehicle_no:'KA02CD5678', route:'Jayanagar → Ryan', status:'completed', date:'2024-06-12' },
-  { id:99,  driver_name:'Suresh Kumar', vehicle_no:'KA01AB1234', route:'Koramangala → DPS', status:'completed', date:'2024-06-11' },
-];
-const DUMMY_SOS = [
-  { id:1, driver:'Suresh Kumar', vehicle:'KA01AB1234', time:'08:12 AM', location:'Near Silk Board', type:'Emergency', status:'active', lat:12.9180, lng:77.6230 },
-  { id:2, driver:'Ravi Shankar', vehicle:'KA02CD5678', time:'Yesterday 07:50 AM', location:'BTM Layout', type:'Medical', status:'resolved', lat:12.9250, lng:77.6050 },
-];
-const DUMMY_ATTENDANCE = [
-  { student:'Aanya Sharma', driver:'Suresh Kumar', date:'2024-06-12', checkin:'07:52 AM', checkout:'08:15 AM', status:'completed' },
-  { student:'Rohan Mehta', driver:'Suresh Kumar', date:'2024-06-12', checkin:'08:01 AM', checkout:'08:15 AM', status:'completed' },
-  { student:'Sia Nair', driver:'Ravi Shankar', date:'2024-06-12', checkin:'07:48 AM', checkout:null, status:'in_progress' },
-  { student:'Arjun Patel', driver:'Ravi Shankar', date:'2024-06-12', checkin:null, checkout:null, status:'missed' },
-];
-const DUMMY_LOST = [
-  { id:1, item:'Blue water bottle', student:'Aanya Sharma', driver:'Suresh Kumar', date:'2024-06-12', status:'found' },
-  { id:2, item:'Purple school bag', student:'Sia Nair', driver:'Ravi Shankar', date:'2024-06-11', status:'searching' },
-];
-
 const navItems = [
   { path:'/admin', end:true, icon:'📊', label:'Overview' },
   { path:'/admin/fleet', icon:'🗺️', label:'Live Fleet' },
@@ -69,11 +44,18 @@ export default function AdminDashboard() {
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 function AdminOverview() {
-  const [drivers, setDrivers] = useState(DUMMY_DRIVERS);
-  const [trips, setTrips] = useState(DUMMY_TRIPS);
+  const [drivers, setDrivers] = useState([]);
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    getAllDrivers().then(setDrivers).catch(() => api.get('/drivers').then(setDrivers).catch(() => {}));
-    getAllTrips().then(setTrips).catch(() => api.get('/trips').then(setTrips).catch(() => {}));
+    Promise.all([
+      getAllDrivers().catch(() => []),
+      getAllTrips().catch(() => []),
+    ]).then(([ds, ts]) => {
+      setDrivers(ds);
+      setTrips(ts);
+    }).finally(() => setLoading(false));
   }, []);
   const active = drivers.filter(d => d.status !== 'offline').length;
   const onTrip = trips.filter(t => t.status === 'in_progress').length;
@@ -82,12 +64,12 @@ function AdminOverview() {
   return (
     <div style={s.page}>
       <div style={s.statsGrid}>
-        <StatCard icon="🚌" label="Total Drivers" value={drivers.length} sub={`${active} online now`} />
-        <StatCard icon="🟢" label="Active Trips" value={onTrip} color={C.green} sub="In progress" />
-        <StatCard icon="✅" label="Completed Today" value={done} color="#8B5CF6" sub="Trips" />
+        <StatCard icon="🚌" label="Total Drivers" value={drivers.length} sub={`${drivers.filter(d=>d.status!=='offline').length} online now`} />
+        <StatCard icon="🟢" label="Active Trips" value={trips.filter(t=>t.status==='in_progress').length} color={C.green} sub="In progress" />
+        <StatCard icon="✅" label="Completed Today" value={trips.filter(t=>t.status==='completed').length} color="#8B5CF6" sub="Trips" />
         <StatCard icon="🛡️" label="Verified Drivers" value={drivers.filter(d=>d.verified).length} color={C.primary} sub={`of ${drivers.length} total`} />
-        <StatCard icon="🚨" label="Active SOS" value={DUMMY_SOS.filter(s=>s.status==='active').length} color={C.red} sub="Requires action" />
-        <StatCard icon="📊" label="On-Time Rate" value="94%" color={C.green} sub="Today" />
+        <StatCard icon="🚨" label="SOS Alerts" value={0} color={C.red} sub="Active" />
+        <StatCard icon="📊" label="On-Time Rate" value="--" color={C.green} sub="Today" />
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.25rem', flexWrap:'wrap' }}>
@@ -184,7 +166,7 @@ function AdminFleet() {
 
 // ── SOS Console (PB-48) ───────────────────────────────────────────────────────
 function AdminSOS() {
-  const [alerts, setAlerts] = useState(DUMMY_SOS);
+  const [alerts, setAlerts] = useState([]);
   const [actionPanel, setActionPanel] = useState(null);
 
   const resolve = (id) => {
@@ -259,7 +241,7 @@ function AdminSOS() {
 
 // ── Attendance Audit (PB-53) ──────────────────────────────────────────────────
 function AdminAttendance() {
-  const [records] = useState(DUMMY_ATTENDANCE);
+  const [records, setRecords] = useState([]);
   const statusColor = { completed:C.green, in_progress:C.primary, missed:C.red };
 
   return (
@@ -378,7 +360,7 @@ function AdminBroadcast() {
 
 // ── Lost & Found (PB-60) ──────────────────────────────────────────────────────
 function AdminLostFound() {
-  const [items, setItems] = useState(DUMMY_LOST);
+  const [items, setItems] = useState([]);
   const statusColor = { found:C.green, searching:C.primary, resolved:C.text3 };
 
   return (
@@ -563,13 +545,14 @@ function AdminAssignStudents() {
     setSaving(studentId);
     setAssignments(prev => ({ ...prev, [studentId]: driverId || '' }));
     try {
-      await api.post('/drivers/assign-student', { student_id: studentId, driver_id: driverId || null });
+      await assignStudentToDriver(studentId, driverId || null);
       const driver = drivers.find(d => d.id === driverId);
       const student = students.find(s => s.id === studentId);
       setMsg(driverId
         ? `✅ ${student?.name} assigned to ${driver?.name}`
         : `✅ ${student?.name} unassigned`);
-    } catch {
+    } catch (err) {
+      console.error('Assignment failed:', err);
       setMsg('⚠️ Save failed — changes shown locally only');
     }
     setSaving(null);
@@ -644,8 +627,11 @@ function AdminAssignStudents() {
 
 // ── Trips ─────────────────────────────────────────────────────────────────────
 function AdminTrips() {
-  const [trips, setTrips] = useState(DUMMY_TRIPS);
-  useEffect(() => { api.get('/trips').then(setTrips).catch(() => {}); }, []);
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { 
+    getAllTrips().then(setTrips).catch(() => []).finally(() => setLoading(false)); 
+  }, []);
   const sc = { in_progress:C.green, completed:C.text3, scheduled:C.primary, cancelled:C.red };
 
   return (

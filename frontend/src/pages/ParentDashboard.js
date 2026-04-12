@@ -10,27 +10,6 @@ import { supabase } from '../supabase';
 
 const C = { primary:'#F59E0B', dark:'#D97706', light:'#FEF3C7', ultraLight:'#FFFBEB', border:'#FDE68A', text:'#1C1917', text2:'#57534E', text3:'#A8A29E', white:'#FFFFFF', green:'#059669', greenBg:'#DCFCE7', red:'#DC2626', redBg:'#FEF2F2', blue:'#2563EB', blueBg:'#EFF6FF' };
 
-const DUMMY_NOTIFS = [
-  { id:1, type:'success', title:'Aanya Boarded', message:'Aanya has boarded the van at Koramangala pickup point.', created_at: new Date(Date.now()-300000).toISOString(), read:false },
-  { id:2, type:'info', title:'ETA Update', message:'Van is 8 minutes away. Current location: Indiranagar.', created_at: new Date(Date.now()-900000).toISOString(), read:false },
-  { id:3, type:'warning', title:'Delay Alert', message:'Van is delayed by 12 minutes due to traffic on OMR.', created_at: new Date(Date.now()-1800000).toISOString(), read:true },
-  { id:4, type:'success', title:'Trip Completed', message:'Aanya was safely dropped at Delhi Public School at 8:12 AM.', created_at: new Date(Date.now()-86400000).toISOString(), read:true },
-  { id:5, type:'error', title:'SOS Alert Triggered', message:'Driver Suresh pressed SOS near Silk Board. Operations team notified.', created_at: new Date(Date.now()-172800000).toISOString(), read:true },
-];
-const DUMMY_TRIPS = [
-  { id:101, date:'2024-06-12', driver_name:'Suresh Kumar', vehicle_no:'KA01AB1234', route:'Koramangala → DPS Whitefield', status:'completed', duration:'42 min', students:'Aanya Sharma' },
-  { id:102, date:'2024-06-11', driver_name:'Suresh Kumar', vehicle_no:'KA01AB1234', route:'Koramangala → DPS Whitefield', status:'completed', duration:'38 min', students:'Aanya Sharma' },
-  { id:103, date:'2024-06-10', driver_name:'Ravi Shankar', vehicle_no:'KA02CD5678', route:'Koramangala → DPS Whitefield', status:'completed', duration:'45 min', students:'Aanya Sharma' },
-  { id:104, date:'2024-06-09', driver_name:'Suresh Kumar', vehicle_no:'KA01AB1234', route:'Koramangala → DPS Whitefield', status:'completed', duration:'40 min', students:'Aanya Sharma' },
-];
-const DUMMY_STUDENTS = [
-  { id:1, name:'Aanya Sharma', school:'Delhi Public School', grade:'Grade 5', pickup_address:'12 Rose Garden, Koramangala', drop_address:'Delhi Public School, Whitefield', driver_name:'Suresh Kumar', vehicle_no:'KA01AB1234', rating:4.8, van_status:'on_trip', lat:12.9352, lng:77.6245 },
-];
-const DUMMY_ACTIVE = { id:101, driver_name:'Suresh Kumar', vehicle_no:'KA01AB1234', vehicle_model:'Tempo Traveller', rating:4.8, lat:12.9388, lng:77.6285, route:'Koramangala → DPS', students:[{ id:1, name:'Aanya Sharma', checked_in:true, checked_out:false }] };
-const DUMMY_LOST = [
-  { id:1, item:'Blue water bottle', description:'Neon blue bottle with name sticker "Aanya"', date:'2024-06-12', status:'found', driver:'Suresh Kumar' },
-  { id:2, item:'School bag (small)', description:'Purple bag with space print', date:'2024-06-08', status:'searching', driver:'Suresh Kumar' },
-];
 const PLANS = [
   { id:'trial', name:'Free Trial', price:'₹0', duration:'7 days', features:['Basic GPS tracking','Push notifications','1 child profile','Email support'], color:'#78716C', popular:false },
   { id:'monthly', name:'Monthly Plan', price:'₹299', duration:'per month', features:['Live GPS tracking','All notifications + SOS','3 child profiles','Driver ratings & history','Priority support'], color:C.primary, popular:true },
@@ -273,10 +252,10 @@ function ParentStudents() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
-  const reload = () => {
+  const reload = useCallback(() => {
     if (!user?.id) return;
-    getMyStudents(user.id).then(d => { if (d.length) setStudents(d); }).catch(() => {});
-  };
+    getMyStudents(user.id).then(setStudents).catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     reload();
@@ -285,23 +264,19 @@ function ParentStudents() {
     });
   }, [user?.id]);
 
-  const addStudent = async (e) => {
+  const addStudentAction = async (e) => {
     e.preventDefault(); setSaving(true); setMsg('');
     try {
-      // Write via backend, then refresh from Supabase
-      await api.post('/students', { ...form });
-      await reload();
+      if (!user?.id) throw new Error('Not logged in');
+      await addStudent({ ...form, parent_id: user.id });
+      reload();
       setShowAdd(false);
       setForm({ name:'', school:'', grade:'', pickup_address:'', drop_address:'' });
       setMsg('✅ Child added successfully!');
       setTimeout(() => setMsg(''), 4000);
-    } catch {
-      // Offline fallback
-      const localSt = { id: Date.now(), ...form, driver_id: null, driver_name: null, vehicle_no: null, van_status: 'offline' };
-      setStudents(p => [...p, localSt]);
-      setShowAdd(false);
-      setMsg('⚠️ Saved locally — will sync when online.');
-      setTimeout(() => setMsg(''), 4000);
+    } catch (err) {
+      console.error('Failed to add student:', err);
+      setMsg(`❌ Error: ${err.message || 'Could not save student'}`);
     }
     setSaving(false);
   };
@@ -316,7 +291,7 @@ function ParentStudents() {
       {showAdd && (
         <div style={s.card}>
           <h3 style={s.cardTitle}>Add a Child</h3>
-          <form onSubmit={addStudent} style={s.addForm}>
+          <form onSubmit={addStudentAction} style={s.addForm}>
             <div style={s.row}>
               <Field label="Child's Name"><input style={s.input} required value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Aanya Sharma" /></Field>
               <Field label="School"><input style={s.input} required value={form.school} onChange={e=>setForm(f=>({...f,school:e.target.value}))} placeholder="Delhi Public School" /></Field>
