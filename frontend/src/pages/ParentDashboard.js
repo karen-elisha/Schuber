@@ -67,7 +67,7 @@ function ParentHome() {
     api.get('/trips/active').then(d => d && setActiveTrip(d)).catch(() => {});
   }, [user?.id]);
 
-  const unread = notifs.filter(n => !n.read && !n.is_read).length;
+  const unread = (notifs || []).filter(n => !n?.read && !n?.is_read).length;
   return (
     <div style={s.page}>
       <div style={s.statsGrid}>
@@ -103,11 +103,15 @@ function ParentHome() {
       <div style={s.card}>
         <h2 style={s.cardTitle}>Recent Notifications</h2>
         <div style={s.notifList}>
-          {notifs.slice(0,4).map(n => (
-            <div key={n.id} style={{ ...s.notifItem, opacity: n.read ? 0.7 : 1 }}>
-              <div style={{ ...s.notifDot, background: n.type==='success'?C.green:n.type==='error'?C.red:C.primary }} />
-              <div style={s.notifContent}><div style={s.notifTitle}>{n.title}</div><div style={s.notifMsg}>{n.message}</div><div style={s.notifTime}>{new Date(n.created_at).toLocaleString()}</div></div>
-              {!n.read && <div style={s.unreadDot} />}
+          {(notifs || []).slice(0, 4).map(n => (
+            <div key={n?.id || Math.random()} style={{ ...s.notifItem, opacity: n?.read ? 0.7 : 1 }}>
+              <div style={{ ...s.notifDot, background: n?.type === 'success' ? C.green : n?.type === 'error' ? C.red : C.primary }} />
+              <div style={s.notifContent}>
+                <div style={s.notifTitle}>{n?.title || 'Notification'}</div>
+                <div style={s.notifMsg}>{n?.message}</div>
+                <div style={s.notifTime}>{n?.created_at ? new Date(n.created_at).toLocaleString() : ''}</div>
+              </div>
+              {!n?.read && <div style={s.unreadDot} />}
             </div>
           ))}
         </div>
@@ -317,7 +321,7 @@ function ParentStudents() {
 
           return (
             <div key={st.id} style={s.studentCard}>
-              <div style={s.studentAv}>{st.name.split(' ').map(n=>n[0]).join('')}</div>
+              <div style={s.studentAv}>{String(st?.name || 'S').split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase() || 'S'}</div>
               <div style={s.studentInfo}>
                 <div style={s.studentName}>{st.name}</div>
                 <div style={s.studentSchool}>{st.school}</div>

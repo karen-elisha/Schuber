@@ -15,7 +15,16 @@ export default function Layout({ children, navItems, title }) {
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email || 'User';
   const role = profile?.role || 'user';
-  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  
+  // Safe initials calculation
+  const initials = String(displayName || '')
+    .split(' ')
+    .filter(Boolean)
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'U';
+
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || null;
 
   return (

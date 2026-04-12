@@ -136,18 +136,18 @@ function DriverHome() {
         <div style={s.card}>
           <h3 style={s.cardTitle}>🎒 Assigned Students ({students.length})</h3>
           <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem', marginTop:'0.5rem' }}>
-            {students.map(st => (
-              <div key={st.id} style={{ display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.6rem 0.875rem', background:C.ultraLight, borderRadius:10 }}>
-                <div style={{ width:36, height:36, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'0.9rem', flexShrink:0 }}>{st.name?.charAt(0)}</div>
+            {(students || []).map(st => (
+              <div key={st?.id || Math.random()} style={{ display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.6rem 0.875rem', background:C.ultraLight, borderRadius:10 }}>
+                <div style={{ width:36, height:36, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'0.9rem', flexShrink:0 }}>{String(st?.name || 'S').charAt(0).toUpperCase()}</div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:600, color:C.text, fontSize:'0.875rem' }}>{st.name}</div>
-                  <div style={{ fontSize:'0.72rem', color:C.text3 }}>{st.school} · {st.grade}</div>
-                  {st.pickup_address && <div style={{ fontSize:'0.72rem', color:C.text3 }}>📍 {st.pickup_address}</div>}
+                  <div style={{ fontWeight:600, color:C.text, fontSize:'0.875rem' }}>{st?.name || 'Student'}</div>
+                  <div style={{ fontSize:'0.72rem', color:C.text3 }}>{st?.school} · {st?.grade}</div>
+                  {st?.pickup_address && <div style={{ fontSize:'0.72rem', color:C.text3 }}>📍 {st.pickup_address}</div>}
                 </div>
-                {st.parent_name && (
+                {st?.parent_name && (
                   <div style={{ textAlign:'right' }}>
                     <div style={{ fontSize:'0.72rem', color:C.text2, fontWeight:600 }}>{st.parent_name}</div>
-                    {st.parent_phone && <div style={{ fontSize:'0.7rem', color:C.text3 }}>{st.parent_phone}</div>}
+                    {st?.parent_phone && <div style={{ fontSize:'0.7rem', color:C.text3 }}>{st.parent_phone}</div>}
                   </div>
                 )}
               </div>
@@ -265,8 +265,8 @@ function DriverTrip() {
   if (loading) return <div style={s.loading}>Loading trip...</div>;
 
   const students = activeTrip?.students || [];
-  const checkedIn = students.filter(s => s.checked_in).length;
-  const droppedOff = students.filter(s => s.checked_out).length;
+  const checkedIn = (students || []).filter(s => s?.checked_in).length;
+  const droppedOff = (students || []).filter(s => s?.checked_out).length;
 
   return (
     <div style={s.page}>
