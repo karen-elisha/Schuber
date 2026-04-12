@@ -167,10 +167,13 @@ export function AuthProvider({ children }) {
         }
       }
 
-      if (!resolvedRole) console.warn('[Auth] ⚠️  No role resolved for', email);
+      if (!resolvedRole) {
+        console.warn('[Auth] ⚠️  No role resolved for', email, '— defaulting to parent');
+        resolvedRole = 'parent';
+      }
 
       // Remember this role for any subsequent bootstrap() calls this session
-      if (resolvedRole) resolvedRoleRef.current = resolvedRole;
+      resolvedRoleRef.current = resolvedRole;
 
       // Persist profile + role to DB when new or roleless
       if (pendingRole || !existingRole) {

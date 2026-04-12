@@ -51,10 +51,10 @@ function AppRoutes() {
   const { user, profile, loading } = useAuth();
   const role = profile?.role;
 
-  console.log('[App] 🧭 Routing State:', { user: user?.email, role, hasProfile: !!profile });
+  console.log('[App] 🧭 Routing State:', { user: user?.email, role, hasProfile: !!profile, loading });
 
-  if (loading || (user && !role)) {
-
+  // 1. Initial global loading (still show spinner while fetching user session)
+  if (loading && !user) {
     return <LoadingScreen text="Entering Schuber..." />;
   }
 
@@ -74,6 +74,7 @@ function AppRoutes() {
       {/* AUTH */}
       <Route path="/login" element={
         !user ? <LoginPage /> : (
+          // If logged in but role still loading, show a better transition
           !role ? <LoadingScreen text="Signing you in..." /> : (
             role === 'driver' && !profile.has_driver_profile 
               ? <Navigate to="/driver-verification" replace />
