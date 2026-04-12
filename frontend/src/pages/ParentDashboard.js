@@ -253,12 +253,16 @@ function ParentTracking() {
 // ── Students ─────────────────────────────────────────────────────────────────
 function ParentStudents() {
   const [students, setStudents] = useState(DUMMY_STUDENTS);
+  const [drivers, setDrivers] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name:'', school:'', grade:'', pickup_address:'', drop_address:'' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
-  useEffect(() => { api.get('/students').then(d => Array.isArray(d) && d.length && setStudents(d)).catch(() => {}); }, []);
+  useEffect(() => {
+    api.get('/students').then(d => Array.isArray(d) && d.length && setStudents(d)).catch(() => {});
+    api.get('/drivers').then(d => Array.isArray(d) && setDrivers(d)).catch(() => {});
+  }, []);
 
   const addStudent = async (e) => {
     e.preventDefault(); setSaving(true); setMsg('');
@@ -270,7 +274,6 @@ function ParentStudents() {
       setMsg('✅ Child added and saved to database!');
       setTimeout(() => setMsg(''), 4000);
     } catch (err) {
-      // Fallback: add locally with temp id
       const localSt = { id: Date.now(), ...form, driver_name: null, vehicle_no: null, van_status: 'offline' };
       setStudents(p => [...p, localSt]);
       setShowAdd(false);
@@ -308,30 +311,41 @@ function ParentStudents() {
         </div>
       )}
       <div style={s.studentGrid}>
-        {students.map(st => (
-          <div key={st.id} style={s.studentCard}>
-            <div style={s.studentAv}>{st.name.split(' ').map(n=>n[0]).join('')}</div>
-            <div style={s.studentInfo}>
-              <div style={s.studentName}>{st.name}</div>
-              <div style={s.studentSchool}>{st.school}</div>
-              {st.grade && <div style={s.gradeBadge}>{st.grade}</div>}
-              {st.pickup_address && <div style={s.addr}>📍 Pickup: {st.pickup_address}</div>}
-              {st.drop_address && <div style={s.addr}>🏫 Drop: {st.drop_address}</div>}
-              {st.driver_name && (
-                <div style={s.assignedDriver}>
-                  <span>🚌 {st.driver_name}</span>
-                  <span style={s.vanNo}>{st.vehicle_no}</span>
-                  <span style={s.verifiedTag}>✅ Verified</span>
-                </div>
-              )}
+        {students.map(st => {
+          const assignedDriver = st.driver_id
+            ? drivers.find(d => d.id === st.driver_id)
+            : st.driver_name ? { name: st.driver_name, vehicle_no: st.vehicle_no, verified: true } : null;
+
+          return (
+            <div key={st.id} style={s.studentCard}>
+              <div style={s.studentAv}>{st.name.split(' ').map(n=>n[0]).join('')}</div>
+              <div style={s.studentInfo}>
+                <div style={s.studentName}>{st.name}</div>
+                <div style={s.studentSchool}>{st.school}</div>
+                {st.grade && <div style={s.gradeBadge}>{st.grade}</div>}
+                {st.pickup_address && <div style={s.addr}>📍 Pickup: {st.pickup_address}</div>}
+                {st.drop_address && <div style={s.addr}>🏫 Drop: {st.drop_address}</div>}
+                {assignedDriver ? (
+                  <div style={s.assignedDriver}>
+                    <span>🚌 {assignedDriver.name}</span>
+                    {assignedDriver.vehicle_no && <span style={s.vanNo}>{assignedDriver.vehicle_no}</span>}
+                    {assignedDriver.verified && <span style={s.verifiedTag}>✅ Verified</span>}
+                  </div>
+                ) : (
+                  <div style={{ marginTop:'0.5rem', padding:'0.4rem 0.75rem', background:C.light, borderRadius:8, fontSize:'0.75rem', color:C.text3 }}>
+                    ⏳ No driver assigned yet
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {students.length === 0 && <div style={s.empty}>No children added yet. Click "+ Add Child" to get started.</div>}
       </div>
     </div>
   );
 }
+
 
 // ── Trips ─────────────────────────────────────────────────────────────────────
 function ParentTrips() {

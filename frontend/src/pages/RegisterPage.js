@@ -76,8 +76,6 @@ export default function RegisterPage() {
 
       if (role === 'driver') {
         navigate('/driver', { replace: true });   // ✅ go to driver dashboard
-      } else {
-        navigate('/parent', { replace: true });
       }
     } catch (err) {
       setError(err.message || 'Registration failed. Try again.');
