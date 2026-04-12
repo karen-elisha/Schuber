@@ -4,6 +4,13 @@ import { supabase, getProfile, signInWithGoogle, signOut } from '../supabase';
 
 const AuthContext = createContext(null);
 
+// Demo accounts that work without real Supabase setup
+const DEMO_ACCOUNTS = {
+  'priya@example.com':   { password:'parent123', role:'parent', full_name:'Priya Sharma', id:'demo-parent-001', email:'priya@example.com', phone:'+91 98765 43210' },
+  'suresh@example.com':  { password:'driver123', role:'driver', full_name:'Suresh Kumar', id:'demo-driver-001', email:'suresh@example.com', phone:'+91 98765 99999' },
+  'admin@schuber.com':   { password:'admin123',  role:'admin',  full_name:'Schuber Admin', id:'demo-admin-001', email:'admin@schuber.com', phone:'+91 98765 00000' },
+};
+
 const DEFAULT_PROFILE_FALLBACK = (user) => ({
   id: user.id,
   role: 'parent',
@@ -18,13 +25,21 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const [isDemoUser, setIsDemoUser] = useState(false);
 
-  // ─── Bootstrap: loads profile after session is confirmed ──────────────────
   const bootstrap = useCallback(async (session) => {
     try {
       setAuthError(null);
-
       if (!session?.user) {
+        // Check for demo session in localStorage
+        const demoSession = localStorage.getItem('schuber-demo-session');
+        if (demoSession) {
+          const demo = JSON.parse(demoSession);
+          setUser({ id: demo.id, email: demo.email });
+          setProfile(demo);
+          setIsDemoUser(true);
+          return;
+        }
         setUser(null);
         setProfile(null);
         return;
@@ -32,134 +47,132 @@ export function AuthProvider({ children }) {
 
       const currentUser = session.user;
       setUser(currentUser);
+      setIsDemoUser(false);
 
-      // Fetch profile with retry (handles race condition after signup)
       let prof = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          prof = await getProfile(currentUser.id);
-          break;
-        } catch (err) {
-          console.warn(`[Auth] Profile fetch attempt ${attempt} failed:`, err?.message);
-          if (attempt < 3) await new Promise(r => setTimeout(r, 600 * attempt));
-        }
+        try { prof = await getProfile(currentUser.id); break; }
+        catch (err) { if (attempt < 3) await new Promise(r => setTimeout(r, 600 * attempt)); }
       }
 
-      // Profile missing → create default
       if (!prof) {
-        console.warn('[Auth] Profile not found. Creating fallback…');
         const fallback = DEFAULT_PROFILE_FALLBACK(currentUser);
-        const { error: upsertError } = await supabase
-          .from('profiles')
-          .upsert(fallback, { onConflict: 'id' });
-        if (upsertError) console.error('[Auth] Fallback upsert failed:', upsertError.message);
+        await supabase.from('profiles').upsert(fallback, { onConflict:'id' }).catch(() => {});
         setProfile(fallback);
         return;
       }
 
-      // Role missing → patch to parent
       if (!prof.role) {
-        await supabase.from('profiles').update({ role: 'parent' }).eq('id', currentUser.id);
-        prof = { ...prof, role: 'parent' };
+        await supabase.from('profiles').update({ role:'parent' }).eq('id', currentUser.id);
+        prof = { ...prof, role:'parent' };
       }
 
-      // Merge OAuth avatar if not yet set
       if (!prof.avatar_url && currentUser.user_metadata?.avatar_url) {
         prof = { ...prof, avatar_url: currentUser.user_metadata.avatar_url };
       }
 
       setProfile(prof);
     } catch (err) {
-      console.error('[Auth] Bootstrap error:', err);
       setAuthError(err?.message ?? 'Authentication error');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // ─── Initialise on mount ──────────────────────────────────────────────────
   useEffect(() => {
-    // Get initial session (handles page refresh + OAuth redirect)
+    // Check demo session first
+    const demoSession = localStorage.getItem('schuber-demo-session');
+    if (demoSession) {
+      try {
+        const demo = JSON.parse(demoSession);
+        setUser({ id: demo.id, email: demo.email });
+        setProfile(demo);
+        setIsDemoUser(true);
+        setLoading(false);
+        return;
+      } catch { localStorage.removeItem('schuber-demo-session'); }
+    }
+
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) console.error('[Auth] getSession error:', error.message);
       bootstrap(session);
     });
 
-    // Listen to auth events (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[Auth] Event:', event);
       bootstrap(session);
     });
 
-    // Safety timeout — prevents infinite loading
-    const timeout = setTimeout(() => {
-      console.warn('[Auth] Timeout — forcing loading off');
-      setLoading(false);
-    }, 8000);
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
+    const timeout = setTimeout(() => setLoading(false), 8000);
+    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, [bootstrap]);
 
-  // ─── Email/password login ─────────────────────────────────────────────────
   async function login(email, password) {
+    // Check demo accounts first
+    const demo = DEMO_ACCOUNTS[email?.toLowerCase()];
+    if (demo && demo.password === password) {
+      const demoProfile = { ...demo };
+      localStorage.setItem('schuber-demo-session', JSON.stringify(demoProfile));
+      setUser({ id: demo.id, email: demo.email });
+      setProfile(demoProfile);
+      setIsDemoUser(true);
+      return { ...demo, role: demo.role };
+    }
+
+    // Real Supabase login
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     const prof = await getProfile(data.user.id).catch(() => null);
     return { ...data.user, role: prof?.role ?? 'parent' };
   }
 
-  // ─── Registration ─────────────────────────────────────────────────────────
   async function register(email, password, fullName, role = 'parent', phone = '') {
     const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
+      email, password,
       options: { data: { full_name: fullName, phone } },
     });
     if (error) throw error;
 
     if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert(
-          { id: data.user.id, role, full_name: fullName, email, phone },
-          { onConflict: 'id' }
-        );
-      if (profileError) console.error('[Auth] Profile upsert failed:', profileError.message);
+      await supabase.from('profiles').upsert(
+        { id: data.user.id, role, full_name: fullName, email, phone },
+        { onConflict:'id' }
+      ).catch(e => console.error('[Auth] Profile upsert failed:', e.message));
     }
-
     return data.user;
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  async function logout() {
+    if (isDemoUser) {
+      localStorage.removeItem('schuber-demo-session');
+      setUser(null);
+      setProfile(null);
+      setIsDemoUser(false);
+      return;
+    }
+    await signOut();
+    localStorage.removeItem('schuber-demo-session');
+  }
+
   async function getAuthHeader() {
+    if (isDemoUser) return { 'X-Demo-User': profile?.role || 'parent', 'Content-Type':'application/json' };
     const { data: { session } } = await supabase.auth.getSession();
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+    return session ? { Authorization:`Bearer ${session.access_token}` } : {};
   }
 
   async function refreshProfile() {
+    if (isDemoUser) return;
     if (!user) return;
-    try {
-      const prof = await getProfile(user.id);
-      if (prof) setProfile(prof);
-    } catch (err) {
-      console.error('[Auth] refreshProfile error:', err);
-    }
+    try { const prof = await getProfile(user.id); if (prof) setProfile(prof); }
+    catch (err) { console.error('[Auth] refreshProfile error:', err); }
   }
 
-  // ─── Context value ────────────────────────────────────────────────────────
   const value = {
-    user,
-    profile,
+    user, profile,
     role: profile?.role ?? null,
-    loading,
-    authError,
-    login,
-    register,
-    signOut,
-    logout: signOut,          // alias so Layout.js works unchanged
+    loading, authError,
+    isDemoUser,
+    login, register,
+    signOut: logout, logout,
     signInWithGoogle,
     getAuthHeader,
     refreshProfile,
@@ -168,19 +181,15 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={value}>
       {loading ? (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          height: '100vh', background: '#FFFBF0', flexDirection: 'column', gap: '1rem',
-        }}>
-          <div style={{ width: 40, height: 40, border: '3px solid #FDE68A', borderTopColor: '#F59E0B', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1rem' }}>
+          <div style={{ width:40, height:40, border:'3px solid #FDE68A', borderTopColor:'#F59E0B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          <div style={{ color: '#D97706', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Loading Schuber…</div>
+          <div style={{ color:'#D97706', fontWeight:600, fontFamily:'DM Sans,sans-serif' }}>Loading Schuber…</div>
         </div>
-      ) : (
-        children
-      )}
+      ) : children}
     </AuthContext.Provider>
   );
 }
 
 export const useAuth = () => useContext(AuthContext);
+

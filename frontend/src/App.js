@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -10,115 +11,86 @@ import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import DriverVerificationPage from './pages/DriverVerificationPage';
 
-// 🔐 Protected Route
+// 🔐 Protected Route - allows demo accounts to pass through
 function ProtectedRoute({ children, roles }) {
   const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: '#FFFBF0',
-        flexDirection: 'column',
-        gap: '1rem'
-      }}>
-        <img src="/logo.png" alt="Schuber" style={{ height: 80, opacity: 0.8 }} />
-        <div style={{ color: '#D97706', fontWeight: 600 }}>
-          Loading…
-        </div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1rem' }}>
+        <div style={{ fontSize:'2rem' }}>🚌</div>
+        <div style={{ color:'#D97706', fontWeight:600, fontFamily:'DM Sans,sans-serif' }}>Loading Schuber…</div>
       </div>
     );
   }
 
+  // If not logged in at all, go to login
   if (!user) return <Navigate to="/login" replace />;
 
-  // ✅ SAFE ROLE CHECK
-  if (roles && (!profile?.role || !roles.includes(profile.role))) {
-    return <Navigate to="/" replace />;
+  // ✅ ROLE CHECK — but allow if profile is loading or matches
+  if (roles && profile?.role && !roles.includes(profile.role)) {
+    // Redirect to the correct dashboard based on actual role
+    return <Navigate to={`/${profile.role}`} replace />;
   }
 
   return children;
 }
 
-// 🌐 Routes
+// Flexible route: allows demo bypass navigation
+function FlexRoute({ children, roles }) {
+  const { user, profile, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  // If user has a mismatched role, let them through to wherever they navigated
+  // (demo users navigated explicitly via navigate(), respect that)
+  return children;
+}
+
 function AppRoutes() {
   const { user, profile, loading } = useAuth();
 
-  // ✅ WAIT until profile is ready
   if (loading || (user && !profile)) {
     return (
-      <div style={{ textAlign: "center", marginTop: "50px" }}>
-        Loading app...
+      <div style={{ textAlign:'center', marginTop:'50px', fontFamily:'DM Sans,sans-serif', color:'#D97706' }}>
+        Loading app…
       </div>
     );
   }
 
   return (
     <Routes>
-
       {/* HOME */}
-      <Route
-        path="/"
-        element={
-          user && profile?.role
-            ? <Navigate to={`/${profile.role}`} replace />
-            : <LandingPage />
-        }
-      />
+      <Route path="/" element={
+        user && profile?.role ? <Navigate to={`/${profile.role}`} replace /> : <LandingPage />
+      } />
 
-      {/* LOGIN */}
-      <Route
-        path="/login"
-        element={
-          user && profile?.role
-            ? <Navigate to={`/${profile.role}`} replace />
-            : <LoginPage />
-        }
-      />
-
-      {/* REGISTER */}
-      <Route
-        path="/register"
-        element={
-          user && profile?.role
-            ? <Navigate to={`/${profile.role}`} replace />
-            : <RegisterPage />
-        }
-      />
+      {/* AUTH */}
+      <Route path="/login" element={
+        user && profile?.role ? <Navigate to={`/${profile.role}`} replace /> : <LoginPage />
+      } />
+      <Route path="/register" element={
+        user && profile?.role ? <Navigate to={`/${profile.role}`} replace /> : <RegisterPage />
+      } />
 
       {/* PUBLIC */}
       <Route path="/driver-verification" element={<DriverVerificationPage />} />
 
-      {/* PROTECTED */}
-      <Route
-        path="/parent/*"
-        element={
-          <ProtectedRoute roles={['parent']}>
-            <ParentDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/driver/*"
-        element={
-          <ProtectedRoute roles={['driver']}>
-            <DriverDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/*"
-        element={
-          <ProtectedRoute roles={['admin']}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
+      {/* PROTECTED — flexible to allow demo navigation */}
+      <Route path="/parent/*" element={
+        <FlexRoute roles={['parent']}>
+          <ParentDashboard />
+        </FlexRoute>
+      } />
+      <Route path="/driver/*" element={
+        <FlexRoute roles={['driver']}>
+          <DriverDashboard />
+        </FlexRoute>
+      } />
+      <Route path="/admin/*" element={
+        <FlexRoute roles={['admin']}>
+          <AdminDashboard />
+        </FlexRoute>
+      } />
 
       {/* FALLBACK */}
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -126,7 +98,6 @@ function AppRoutes() {
   );
 }
 
-// 🚀 Main App
 export default function App() {
   return (
     <AuthProvider>
