@@ -9,10 +9,18 @@ const STEPS = ['Vehicle Details','License & Experience','Upload Documents','Conf
 
 export default function DriverVerificationPage() {
   const navigate = useNavigate();
-  const { user, refreshProfile } = useAuth();
+  const { user, role, refreshProfile } = useAuth();
   const dlRef  = useRef();
   const rcRef  = useRef();
   const picRef = useRef();
+
+  useEffect(() => {
+    // Safety: If you are not a driver, you shouldn't be here
+    if (role && role !== 'driver') {
+      console.log('[Verification] 🚫 Not a driver, redirecting to:', role);
+      navigate(`/${role}`, { replace: true });
+    }
+  }, [role, navigate]);
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);

@@ -51,7 +51,10 @@ function AppRoutes() {
   const { user, profile, loading } = useAuth();
   const role = profile?.role;
 
+  console.log('[App] 🧭 Routing State:', { user: user?.email, role, hasProfile: !!profile });
+
   if (loading || (user && !role)) {
+
     return <LoadingScreen text="Entering Schuber..." />;
   }
 
@@ -88,12 +91,8 @@ function AppRoutes() {
         )
       } />
 
-      {/* PUBLIC */}
-      <Route path="/driver-verification" element={
-        <ProtectedRoute roles={['driver']}>
-          <DriverVerificationPage />
-        </ProtectedRoute>
-      } />
+      {/* PUBLIC / SETUP */}
+      <Route path="/driver-verification" element={<DriverVerificationPage />} />
 
       {/* PROTECTED — strict role enforcement */}
       <Route path="/parent/*" element={

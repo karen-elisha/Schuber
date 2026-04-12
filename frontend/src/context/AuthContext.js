@@ -174,13 +174,20 @@ export function AuthProvider({ children }) {
 
       // Persist profile + role to DB when new or roleless
       if (pendingRole || !existingRole) {
-        await supabase.from('profiles').upsert({
+        console.log('[Auth] 📝 Saving profile to DB:', { id: session.user.id, role: resolvedRole });
+        const { error: upsertErr } = await supabase.from('profiles').upsert({
           id:        session.user.id,
           email,
           role:      resolvedRole || 'parent',
           full_name: dbProf?.full_name || meta.full_name || meta.name || email,
           phone:     dbProf?.phone     || meta.phone     || null,
-        }, { onConflict: 'id' }).catch(() => {});
+        }, { onConflict: 'id' });
+
+        if (upsertErr) {
+          console.error('[Auth] ❌ Profile Upsert Failed:', upsertErr.message);
+        } else {
+          console.log('[Auth] ✅ Profile saved successfully.');
+        }
 
         // New driver → flag for verification form
         if (resolvedRole === 'driver' && !existingRole) {
@@ -195,7 +202,8 @@ export function AuthProvider({ children }) {
         full_name:  dbProf?.full_name ?? meta.full_name ?? email,
         phone:      dbProf?.phone     ?? meta.phone     ?? null,
         avatar_url: dbProf?.avatar_url ?? meta.avatar_url ?? null,
-        has_driver_profile: dbProf?.driver_profile_exists ?? false,
+        // Only drivers need a driver profile; others are 'complete' by default
+        has_driver_profile: resolvedRole !== 'driver' || (dbProf?.driver_profile_exists ?? false),
         is_verified: dbProf?.is_verified ?? false,
       });
     } finally {
