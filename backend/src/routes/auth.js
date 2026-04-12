@@ -4,7 +4,6 @@ const supabase = require('../db');
 // ✅ Use correct middleware
 const { authenticate: auth } = require('../middleware');
 
-
 // ─────────────────────────────
 // 🔐 LOGIN (Supabase)
 // ─────────────────────────────

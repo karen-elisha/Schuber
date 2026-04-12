@@ -54,7 +54,7 @@ export default function RegisterPage() {
   };
 
   const clearFieldError = (field) => {
-    if (errors[field]) setErrors(e => { const n = {...e}; delete n[field]; return n; });
+    if (errors[field]) setErrors(e => { const n = { ...e }; delete n[field]; return n; });
   };
 
   const updateField = (field, value) => {
@@ -72,8 +72,13 @@ export default function RegisterPage() {
         setSuccess('Account created! Check your email to confirm, then sign in.');
         return;
       }
-      if (form.role === 'driver') navigate('/driver-verification');
-      else navigate(`/${form.role}`, { replace: true });
+      const role = user?.user_metadata?.role || form.role;
+
+      if (role === 'driver') {
+        navigate('/driver', { replace: true });   // ✅ go to driver dashboard
+      } else {
+        navigate('/parent', { replace: true });
+      }
     } catch (err) {
       setError(err.message || 'Registration failed. Try again.');
     } finally {
@@ -104,7 +109,7 @@ export default function RegisterPage() {
       <div style={s.formSide}>
         <div style={s.formInner}>
           <Link to="/" style={s.logo}>
-            <div style={s.logoText}>🚌 <span style={{color:'#F59E0B'}}>Schu</span>ber</div>
+            <div style={s.logoText}>🚌 <span style={{ color: '#F59E0B' }}>Schu</span>ber</div>
           </Link>
 
           <div style={s.headGroup}>
@@ -124,30 +129,30 @@ export default function RegisterPage() {
 
           {/* Google Sign-Up */}
           <button onClick={handleGoogle} style={s.googleBtn}>
-            <svg width="18" height="18" viewBox="0 0 48 48" style={{flexShrink:0}}>
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            <svg width="18" height="18" viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
             </svg>
             Sign up with Google
           </button>
 
           <div style={s.dividerRow}>
-            <div style={s.dividerLine}/>
+            <div style={s.dividerLine} />
             <span style={s.dividerTxt}>or register with email</span>
-            <div style={s.dividerLine}/>
+            <div style={s.dividerLine} />
           </div>
 
           {/* Role Toggle */}
           <div style={s.roleSection}>
             <p style={s.roleSectionLabel}>I am registering as:</p>
             <div style={s.roleToggle}>
-              {[['parent','👨‍👩‍👧','Parent'],['driver','🚌','Driver']].map(([r,icon,label]) => (
+              {[['parent', '👨‍👩‍👧', 'Parent'], ['driver', '🚌', 'Driver']].map(([r, icon, label]) => (
                 <button key={r} className="role-btn"
                   style={{ ...s.roleBtn, ...(form.role === r ? s.roleBtnActive : {}) }}
                   onClick={() => setForm(f => ({ ...f, role: r }))}>
-                  <span style={{fontSize:'1.2rem'}}>{icon}</span>
+                  <span style={{ fontSize: '1.2rem' }}>{icon}</span>
                   <span>{label}</span>
                   {form.role === r && <span style={s.roleCheck}>✓</span>}
                 </button>
@@ -159,33 +164,33 @@ export default function RegisterPage() {
             <div style={s.row}>
               <div style={s.field}>
                 <label style={s.label}>Full Name *</label>
-                <input className="reg-input" style={{...s.input, ...(errors.name ? {borderColor:'#DC2626'} : {})}} required value={form.name}
+                <input className="reg-input" style={{ ...s.input, ...(errors.name ? { borderColor: '#DC2626' } : {}) }} required value={form.name}
                   onChange={e => updateField('name', e.target.value)} placeholder="Priya Sharma" />
                 {errors.name && <div style={s.fieldError}>{errors.name}</div>}
               </div>
               <div style={s.field}>
                 <label style={s.label}>Phone Number</label>
-                <input className="reg-input" style={{...s.input, ...(errors.phone ? {borderColor:'#DC2626'} : {})}} value={form.phone}
+                <input className="reg-input" style={{ ...s.input, ...(errors.phone ? { borderColor: '#DC2626' } : {}) }} value={form.phone}
                   onChange={e => updateField('phone', e.target.value)} placeholder="+91 98765 43210" />
                 {errors.phone && <div style={s.fieldError}>{errors.phone}</div>}
               </div>
             </div>
             <div style={s.field}>
               <label style={s.label}>Email Address *</label>
-              <input className="reg-input" style={{...s.input, ...(errors.email ? {borderColor:'#DC2626'} : {})}} type="email" required value={form.email}
+              <input className="reg-input" style={{ ...s.input, ...(errors.email ? { borderColor: '#DC2626' } : {}) }} type="email" required value={form.email}
                 onChange={e => updateField('email', e.target.value)} placeholder="you@example.com" />
               {errors.email && <div style={s.fieldError}>{errors.email}</div>}
             </div>
             <div style={s.row}>
               <div style={s.field}>
                 <label style={s.label}>Password *</label>
-                <div style={{position:'relative'}}>
-                  <input className="reg-input" style={{...s.input, paddingRight:'2.5rem', ...(errors.password ? {borderColor:'#DC2626'} : {})}}
+                <div style={{ position: 'relative' }}>
+                  <input className="reg-input" style={{ ...s.input, paddingRight: '2.5rem', ...(errors.password ? { borderColor: '#DC2626' } : {}) }}
                     type={showPass ? 'text' : 'password'} required value={form.password}
                     onChange={e => updateField('password', e.target.value)}
                     placeholder="Min. 6 characters" minLength={6} />
-                  <button type="button" onClick={() => setShowPass(v=>!v)}
-                    style={{position:'absolute',right:'0.75rem',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'0.9rem'}}>
+                  <button type="button" onClick={() => setShowPass(v => !v)}
+                    style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>
                     {showPass ? '🙈' : '👁️'}
                   </button>
                 </div>
@@ -193,7 +198,7 @@ export default function RegisterPage() {
               </div>
               <div style={s.field}>
                 <label style={s.label}>Confirm Password *</label>
-                <input className="reg-input" style={{...s.input, ...(errors.confirmPassword ? {borderColor:'#DC2626'} : {})}} type="password" required value={form.confirmPassword}
+                <input className="reg-input" style={{ ...s.input, ...(errors.confirmPassword ? { borderColor: '#DC2626' } : {}) }} type="password" required value={form.confirmPassword}
                   onChange={e => updateField('confirmPassword', e.target.value)}
                   placeholder="Re-enter password" minLength={6} />
                 {errors.confirmPassword && <div style={s.fieldError}>{errors.confirmPassword}</div>}
@@ -202,7 +207,7 @@ export default function RegisterPage() {
             {error && <div style={s.error}>⚠️ {error}</div>}
             {success && <div style={s.successBox}>✅ {success}</div>}
             <button type="submit" disabled={loading} className="submit-reg"
-              style={{...s.submit, opacity: loading ? 0.8 : 1}}>
+              style={{ ...s.submit, opacity: loading ? 0.8 : 1 }}>
               {loading ? <span style={s.spinner} /> : null}
               {loading ? 'Creating account…' : `Create ${form.role === 'parent' ? 'Parent' : 'Driver'} Account — Free →`}
             </button>
@@ -214,7 +219,7 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <p style={s.terms}>By registering you agree to our <span style={{color:'#D97706',cursor:'pointer'}}>Terms of Service</span> and <span style={{color:'#D97706',cursor:'pointer'}}>Privacy Policy</span>.</p>
+          <p style={s.terms}>By registering you agree to our <span style={{ color: '#D97706', cursor: 'pointer' }}>Terms of Service</span> and <span style={{ color: '#D97706', cursor: 'pointer' }}>Privacy Policy</span>.</p>
           <p style={s.switchText}>
             Already have an account? <Link to="/login" style={s.switchLink}>Sign in →</Link>
           </p>

@@ -3,7 +3,7 @@ const supabase = require('../db');
 const { authenticate: auth } = require('../middleware');
 
 // ─────────────────────────────
-// 📋 Get all drivers (admin)
+// 📋 Get all drivers (admin/parent)
 // ─────────────────────────────
 router.get('/', auth, async (req, res) => {
   try {
@@ -13,7 +13,6 @@ router.get('/', auth, async (req, res) => {
 
     if (error) throw error;
 
-    // Flatten for frontend
     const result = (drivers || []).map(d => ({
       id: d.id,
       user_id: d.user_id,
@@ -52,15 +51,24 @@ router.get('/me', auth, async (req, res) => {
       .eq('user_id', req.user.id)
       .single();
 
-    if (error) throw error;
+    if (error || !driver) {
+      // Driver record may not exist yet — return profile info
+      return res.json({
+        id: null, user_id: req.user.id,
+        name: req.user.full_name || 'Driver',
+        email: req.user.email, phone: req.user.phone || '',
+        vehicle_no: null, vehicle_model: null, license_no: null,
+        capacity: 12, route: null, lat: null, lng: null,
+        status: 'offline', verified: false, rating: 0,
+      });
+    }
 
-    // Flatten for frontend
     res.json({
       id: driver.id,
       user_id: driver.user_id,
       name: driver.profiles?.full_name || req.user.full_name || 'Driver',
       email: driver.profiles?.email || req.user.email,
-      phone: driver.profiles?.phone || '',
+      phone: driver.profiles?.phone || req.user.phone || '',
       vehicle_no: driver.vehicle_no,
       vehicle_model: driver.vehicle_model,
       license_no: driver.license_no,
@@ -78,35 +86,26 @@ router.get('/me', auth, async (req, res) => {
 });
 
 // ─────────────────────────────
-// ✏️ Update own driver profile (full update)
+// ✏️ Update own driver profile
 // ─────────────────────────────
 router.patch('/me', auth, async (req, res) => {
   if (req.user.role !== 'driver')
     return res.status(403).json({ error: 'Forbidden' });
 
-  const { phone, vehicle_model, capacity, route } = req.body;
+  const { phone, vehicle_model, capacity, route, license_no, vehicle_no } = req.body;
 
   try {
-    // Update driver record
-    const updateData = {};
-    if (vehicle_model) updateData.vehicle_model = vehicle_model;
-    if (capacity) updateData.capacity = parseInt(capacity) || 12;
-    if (route) updateData.route = route;
-    updateData.updated_at = new Date().toISOString();
+    const updateData = { updated_at: new Date().toISOString() };
+    if (vehicle_model !== undefined) updateData.vehicle_model = vehicle_model;
+    if (vehicle_no !== undefined) updateData.vehicle_no = vehicle_no;
+    if (license_no !== undefined) updateData.license_no = license_no;
+    if (capacity !== undefined) updateData.capacity = parseInt(capacity) || 12;
+    if (route !== undefined) updateData.route = route;
 
-    if (Object.keys(updateData).length > 1) {
-      await supabase
-        .from('drivers')
-        .update(updateData)
-        .eq('user_id', req.user.id);
-    }
+    await supabase.from('drivers').update(updateData).eq('user_id', req.user.id);
 
-    // Update phone in profile
     if (phone) {
-      await supabase
-        .from('profiles')
-        .update({ phone, updated_at: new Date().toISOString() })
-        .eq('id', req.user.id);
+      await supabase.from('profiles').update({ phone }).eq('id', req.user.id);
     }
 
     res.json({ success: true });
@@ -124,15 +123,12 @@ router.patch('/location', auth, async (req, res) => {
 
   const { lat, lng } = req.body;
   if (lat == null || lng == null)
-    return res.status(400).json({ error: 'lat and lng are required' });
+    return res.status(400).json({ error: 'lat and lng required' });
 
   try {
-    const { error } = await supabase
-      .from('drivers')
+    await supabase.from('drivers')
       .update({ lat, lng, updated_at: new Date().toISOString() })
       .eq('user_id', req.user.id);
-
-    if (error) throw error;
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -147,12 +143,10 @@ router.patch('/status', auth, async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
 
   try {
-    // Frontend sends { status: 'online'|'offline' }
     const status = req.body.status;
     const isOnline = status === 'online';
 
-    const { error } = await supabase
-      .from('drivers')
+    const { error } = await supabase.from('drivers')
       .update({ is_online: isOnline, updated_at: new Date().toISOString() })
       .eq('user_id', req.user.id);
 
@@ -164,22 +158,75 @@ router.patch('/status', auth, async (req, res) => {
 });
 
 // ─────────────────────────────
-// ✏️ Update driver profile (license, vehicle, route)
+// ✅ Verify/unverify driver (admin)
 // ─────────────────────────────
-router.patch('/profile', auth, async (req, res) => {
-  if (req.user.role !== 'driver')
+router.patch('/:id/verify', auth, async (req, res) => {
+  if (req.user.role !== 'admin')
     return res.status(403).json({ error: 'Forbidden' });
 
-  const { license_no, vehicle_no, route } = req.body;
-
+  const { verified } = req.body;
   try {
-    const { error } = await supabase
-      .from('drivers')
-      .update({ license_no, vehicle_no, route, updated_at: new Date().toISOString() })
-      .eq('user_id', req.user.id);
+    const { error } = await supabase.from('drivers')
+      .update({ verified: !!verified, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id);
 
     if (error) throw error;
-    res.json({ success: true });
+    res.json({ success: true, verified: !!verified });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────
+// 👤 Get students assigned to this driver
+// ─────────────────────────────
+router.get('/:id/students', auth, async (req, res) => {
+  try {
+    const { data: students, error } = await supabase
+      .from('students')
+      .select('*, profiles!parent_id(full_name, phone, email)')
+      .eq('driver_id', req.params.id);
+
+    if (error) throw error;
+
+    const result = (students || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      school: s.school,
+      grade: s.grade,
+      pickup_address: s.pickup_address,
+      drop_address: s.drop_address,
+      parent_name: s.profiles?.full_name || 'Parent',
+      parent_phone: s.profiles?.phone || '',
+      parent_email: s.profiles?.email || '',
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────
+// 📋 Assign student to driver (admin)
+// ─────────────────────────────
+router.post('/assign-student', auth, async (req, res) => {
+  if (req.user.role !== 'admin')
+    return res.status(403).json({ error: 'Forbidden' });
+
+  const { student_id, driver_id } = req.body;
+  if (!student_id) return res.status(400).json({ error: 'student_id required' });
+
+  try {
+    const { data, error } = await supabase
+      .from('students')
+      .update({ driver_id: driver_id || null })
+      .eq('id', student_id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, student: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

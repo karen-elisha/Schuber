@@ -36,6 +36,7 @@ const navItems = [
   { path:'/admin', end:true, icon:'📊', label:'Overview' },
   { path:'/admin/fleet', icon:'🗺️', label:'Live Fleet' },
   { path:'/admin/drivers', icon:'🚌', label:'Drivers' },
+  { path:'/admin/assign', icon:'🔗', label:'Assign Students' },
   { path:'/admin/trips', icon:'📋', label:'All Trips' },
   { path:'/admin/sos', icon:'🚨', label:'SOS Console' },
   { path:'/admin/attendance', icon:'📝', label:'Attendance Audit' },
@@ -46,13 +47,14 @@ const navItems = [
 
 export default function AdminDashboard() {
   const location = useLocation();
-  const titles = { '/admin':'Overview', '/admin/fleet':'Live Fleet Map', '/admin/drivers':'Drivers', '/admin/trips':'All Trips', '/admin/sos':'SOS Console', '/admin/attendance':'Attendance Audit', '/admin/broadcast':'Parent Broadcast', '/admin/lostfound':'Lost & Found Tickets', '/admin/reports':'Daily Ops Report' };
+  const titles = { '/admin':'Overview', '/admin/fleet':'Live Fleet Map', '/admin/drivers':'Drivers', '/admin/assign':'Assign Students to Drivers', '/admin/trips':'All Trips', '/admin/sos':'SOS Console', '/admin/attendance':'Attendance Audit', '/admin/broadcast':'Parent Broadcast', '/admin/lostfound':'Lost & Found Tickets', '/admin/reports':'Daily Ops Report' };
   return (
     <Layout navItems={navItems} title={titles[location.pathname] || 'Admin'}>
       <Routes>
         <Route index element={<AdminOverview />} />
         <Route path="fleet" element={<AdminFleet />} />
         <Route path="drivers" element={<AdminDrivers />} />
+        <Route path="assign" element={<AdminAssignStudents />} />
         <Route path="trips" element={<AdminTrips />} />
         <Route path="sos" element={<AdminSOS />} />
         <Route path="attendance" element={<AdminAttendance />} />
@@ -477,12 +479,29 @@ function AdminReports() {
 // ── Drivers ───────────────────────────────────────────────────────────────────
 function AdminDrivers() {
   const [drivers, setDrivers] = useState(DUMMY_DRIVERS);
-  useEffect(() => { api.get('/drivers').then(setDrivers).catch(() => {}); }, []);
-  const toggle = (id, field) => setDrivers(ds => ds.map(d => d.id === id ? {...d, [field]: !d[field]} : d));
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api.get('/drivers').then(d => { if (Array.isArray(d) && d.length) setDrivers(d); }).catch(() => {});
+  }, []);
+
+  const verifyDriver = async (driver) => {
+    const newVerified = !driver.verified;
+    try {
+      await api.patch(`/drivers/${driver.id}/verify`, { verified: newVerified });
+      setDrivers(ds => ds.map(d => d.id === driver.id ? {...d, verified: newVerified} : d));
+      setMsg(`✅ ${driver.name} ${newVerified ? 'verified' : 'unverified'} successfully`);
+    } catch {
+      setDrivers(ds => ds.map(d => d.id === driver.id ? {...d, verified: newVerified} : d));
+      setMsg(`✅ Status updated (local only)`);
+    }
+    setTimeout(() => setMsg(''), 3000);
+  };
 
   return (
     <div style={s.page}>
       <h2 style={s.pageTitle}>All Drivers ({drivers.length})</h2>
+      {msg && <div style={{ padding:'0.75rem 1rem', borderRadius:10, background:C.greenBg, color:C.green, fontSize:'0.875rem', border:`1px solid #A7F3D0` }}>{msg}</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px,1fr))', gap:'1rem' }}>
         {drivers.map(d => (
           <div key={d.id} style={s.card}>
@@ -492,24 +511,132 @@ function AdminDrivers() {
                 <div style={{ fontWeight:700, color:C.text }}>{d.name}</div>
                 <div style={{ color:C.text2, fontSize:'0.8rem' }}>{d.email}</div>
                 <div style={{ fontSize:'0.72rem', color:C.text3 }}>{d.vehicle_no} · ⭐ {d.rating}</div>
+                {d.route && <div style={{ fontSize:'0.72rem', color:C.text3, marginTop:'0.2rem' }}>📍 {d.route}</div>}
               </div>
             </div>
-            <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap', marginBottom:'0.875rem' }}>
               <span style={{ ...s.statusPill, background: d.status === 'on_trip' ? C.greenBg : d.status === 'online' ? C.light : '#F1F5F9', color: d.status === 'on_trip' ? C.green : d.status === 'online' ? C.dark : C.text3 }}>{d.status?.replace('_',' ')}</span>
               <span style={{ ...s.statusPill, background: d.verified ? C.greenBg : C.redBg, color: d.verified ? C.green : C.red }}>{d.verified ? '✓ Verified' : '✗ Unverified'}</span>
+              {d.capacity && <span style={{ ...s.statusPill, background: C.blueBg, color: C.blue }}>Capacity: {d.capacity}</span>}
             </div>
-            <div style={{ display:'flex', gap:'0.5rem', marginTop:'0.875rem' }}>
+            <div style={{ display:'flex', gap:'0.5rem' }}>
               <button style={{ ...s.submitBtn, fontSize:'0.75rem', padding:'0.4rem 0.875rem', background: d.verified ? C.red : C.green }}
-                onClick={() => toggle(d.id, 'verified')}>
-                {d.verified ? 'Revoke' : 'Verify'}
-              </button>
-              <button style={{ ...s.submitBtn, fontSize:'0.75rem', padding:'0.4rem 0.875rem', background:C.blue }}>
-                Reassign Route
+                onClick={() => verifyDriver(d)}>
+                {d.verified ? '✗ Revoke' : '✓ Verify'}
               </button>
             </div>
           </div>
         ))}
+        {drivers.length === 0 && <div style={s.empty}>No drivers registered</div>}
       </div>
+    </div>
+  );
+}
+
+// ── Assign Students ────────────────────────────────────────────────────────────
+function AdminAssignStudents() {
+  const [students, setStudents] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [assignments, setAssignments] = useState({});  // studentId → driverId
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/students').catch(() => []),
+      api.get('/drivers').catch(() => []),
+    ]).then(([sts, drvs]) => {
+      const studentList = Array.isArray(sts) ? sts : [];
+      const driverList  = Array.isArray(drvs) ? drvs : [];
+      setStudents(studentList);
+      setDrivers(driverList);
+      // Pre-fill existing assignments
+      const map = {};
+      studentList.forEach(s => { if (s.driver_id) map[s.id] = s.driver_id; });
+      setAssignments(map);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const assign = async (studentId, driverId) => {
+    setSaving(studentId);
+    setAssignments(prev => ({ ...prev, [studentId]: driverId || '' }));
+    try {
+      await api.post('/drivers/assign-student', { student_id: studentId, driver_id: driverId || null });
+      const driver = drivers.find(d => d.id === driverId);
+      const student = students.find(s => s.id === studentId);
+      setMsg(driverId
+        ? `✅ ${student?.name} assigned to ${driver?.name}`
+        : `✅ ${student?.name} unassigned`);
+    } catch {
+      setMsg('⚠️ Save failed — changes shown locally only');
+    }
+    setSaving(null);
+    setTimeout(() => setMsg(''), 4000);
+  };
+
+  if (loading) return <div style={s.empty}>Loading students and drivers…</div>;
+
+  return (
+    <div style={s.page}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <h2 style={s.pageTitle}>Assign Students to Drivers</h2>
+        <div style={{ fontSize:'0.82rem', color:C.text3 }}>{students.length} students · {drivers.length} drivers</div>
+      </div>
+
+      {msg && (
+        <div style={{ padding:'0.75rem 1rem', borderRadius:10, background: msg.startsWith('✅') ? C.greenBg : '#FEF3C7', color: msg.startsWith('✅') ? C.green : '#92400E', fontSize:'0.875rem', border:`1px solid ${msg.startsWith('✅') ? '#A7F3D0' : C.border}` }}>{msg}</div>
+      )}
+
+      {students.length === 0 ? (
+        <div style={{ ...s.card, textAlign:'center', color:C.text3 }}>
+          <div style={{ fontSize:'2rem', marginBottom:'0.75rem' }}>🎒</div>
+          <div style={{ fontWeight:600 }}>No students registered yet</div>
+          <div style={{ fontSize:'0.85rem', marginTop:'0.5rem' }}>Parents need to add their children first via the Parent Dashboard.</div>
+        </div>
+      ) : (
+        <div style={s.table}>
+          <div style={{ ...s.tableHead, gridTemplateColumns:'2fr 1.5fr 2fr 1.5fr 1fr' }}>
+            <span>Student</span><span>School / Grade</span><span>Parent</span><span>Assigned Driver</span><span>Status</span>
+          </div>
+          {students.map(st => {
+            const assignedDriverId = assignments[st.id] || '';
+            const assignedDriver   = drivers.find(d => d.id === assignedDriverId);
+            return (
+              <div key={st.id} style={{ ...s.tableRow, gridTemplateColumns:'2fr 1.5fr 2fr 1.5fr 1fr', alignItems:'center' }}>
+                <div>
+                  <div style={{ fontWeight:600, color:C.text }}>{st.name}</div>
+                  {st.pickup_address && <div style={{ fontSize:'0.72rem', color:C.text3 }}>📍 {st.pickup_address}</div>}
+                </div>
+                <div>
+                  <div style={{ fontWeight:500, color:C.text2, fontSize:'0.85rem' }}>{st.school || '—'}</div>
+                  {st.grade && <div style={{ fontSize:'0.72rem', color:C.text3 }}>{st.grade}</div>}
+                </div>
+                <div style={{ fontSize:'0.82rem', color:C.text2 }}>{st.parent_name || st.parent_email || '—'}</div>
+                <select
+                  style={{ ...s.input, fontSize:'0.82rem', padding:'0.4rem 0.6rem', cursor:'pointer', opacity: saving === st.id ? 0.6 : 1 }}
+                  value={assignedDriverId}
+                  disabled={saving === st.id}
+                  onChange={e => assign(st.id, e.target.value)}>
+                  <option value="">— Unassigned —</option>
+                  {drivers.map(d => (
+                    <option key={d.id} value={d.id}>{d.name} · {d.vehicle_no}</option>
+                  ))}
+                </select>
+                <span style={{ ...s.statusPill, background: assignedDriver ? C.greenBg : C.light, color: assignedDriver ? C.green : C.text3, textAlign:'center' }}>
+                  {saving === st.id ? '⏳' : assignedDriver ? '✓ Assigned' : 'None'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {drivers.length === 0 && (
+        <div style={{ ...s.card, background:'#FEF3C7', borderColor:C.border, color:'#92400E', fontSize:'0.875rem' }}>
+          ⚠️ No drivers found. Ask drivers to register and get verified first.
+        </div>
+      )}
     </div>
   );
 }

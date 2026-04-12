@@ -53,14 +53,32 @@ export default function DriverDashboard() {
 // ── Home ─────────────────────────────────────────────────────────────────────
 function DriverHome() {
   const [driverInfo, setDriverInfo] = useState(DUMMY_DRIVER);
-  const [students, setStudents] = useState(DUMMY_STUDENTS);
+  const [students, setStudents] = useState([]);
   const [trips, setTrips] = useState(DUMMY_TRIPS);
-  const [status, setStatus] = useState('online');
+  const [status, setStatus] = useState('offline');
   const [toggling, setToggling] = useState(false);
+  const [loadingStudents, setLoadingStudents] = useState(true);
 
   useEffect(() => {
-    api.get('/drivers/me').then(d => { if(d){setDriverInfo(d); setStatus(d?.status||'offline');} }).catch(() => {});
-    api.get('/students').then(d => Array.isArray(d) && d.length && setStudents(d)).catch(() => {});
+    api.get('/drivers/me').then(d => {
+      if (d) {
+        setDriverInfo(d);
+        setStatus(d?.status || 'offline');
+        // Now fetch assigned students using the driver's DB ID
+        if (d.id) {
+          api.get(`/drivers/${d.id}/students`)
+            .then(sts => { if (Array.isArray(sts)) setStudents(sts); })
+            .catch(() => setStudents(DUMMY_STUDENTS))
+            .finally(() => setLoadingStudents(false));
+        } else {
+          setStudents(DUMMY_STUDENTS);
+          setLoadingStudents(false);
+        }
+      }
+    }).catch(() => {
+      setStudents(DUMMY_STUDENTS);
+      setLoadingStudents(false);
+    });
     api.get('/trips').then(d => Array.isArray(d) && d.length && setTrips(d)).catch(() => {});
   }, []);
 
@@ -96,9 +114,15 @@ function DriverHome() {
         )}
       </div>
 
+      {!driverInfo?.verified && (
+        <div style={{ background:'#FEF3C7', border:`1.5px solid ${C.border}`, borderRadius:12, padding:'0.875rem 1.25rem', color:'#92400E', fontSize:'0.875rem', fontWeight:500 }}>
+          ⏳ Your account is pending verification by the admin. Some features may be limited.
+        </div>
+      )}
+
       <div style={s.statsGrid}>
-        <StatCard icon="🎒" label="Assigned Students" value={students.length} sub="On your route" />
-        <StatCard icon="✅" label="Trips Today" value={trips.filter(t=>t.date===new Date().toISOString().split('T')[0]).length || 1} color={C.green} sub="Completed" />
+        <StatCard icon="🎒" label="Assigned Students" value={loadingStudents ? '…' : students.length} sub="On your route" />
+        <StatCard icon="✅" label="Trips Today" value={trips.filter(t=>t.date===new Date().toISOString().split('T')[0]).length || 0} color={C.green} sub="Completed" />
         <StatCard icon="⭐" label="Your Rating" value={driverInfo?.rating||'—'} color="#8B5CF6" sub="Average" />
         <StatCard icon="🛡️" label="Verified" value={driverInfo?.verified?'✓ Yes':'✗ No'} color={driverInfo?.verified?C.green:C.red} />
       </div>
@@ -107,8 +131,32 @@ function DriverHome() {
         <div style={s.card}>
           <h3 style={s.cardTitle}>🚌 Vehicle & Route Details</h3>
           <div style={s.infoGrid}>
-            {[['Vehicle No',driverInfo.vehicle_no],['Model',driverInfo.vehicle_model||'—'],['License',driverInfo.license_no],['Capacity',(driverInfo.capacity||12)+' students'],['Route',driverInfo.route]].map(([l,v]) => (
+            {[['Vehicle No',driverInfo.vehicle_no],['Model',driverInfo.vehicle_model||'—'],['License',driverInfo.license_no||'—'],['Capacity',(driverInfo.capacity||12)+' students'],['Route',driverInfo.route||'Not assigned']].map(([l,v]) => (
               <div key={l}><div style={s.iLabel}>{l}</div><div style={s.iValue}>{v||'—'}</div></div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {students.length > 0 && (
+        <div style={s.card}>
+          <h3 style={s.cardTitle}>🎒 Assigned Students ({students.length})</h3>
+          <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem', marginTop:'0.5rem' }}>
+            {students.map(st => (
+              <div key={st.id} style={{ display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.6rem 0.875rem', background:C.ultraLight, borderRadius:10 }}>
+                <div style={{ width:36, height:36, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'0.9rem', flexShrink:0 }}>{st.name?.charAt(0)}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:600, color:C.text, fontSize:'0.875rem' }}>{st.name}</div>
+                  <div style={{ fontSize:'0.72rem', color:C.text3 }}>{st.school} · {st.grade}</div>
+                  {st.pickup_address && <div style={{ fontSize:'0.72rem', color:C.text3 }}>📍 {st.pickup_address}</div>}
+                </div>
+                {st.parent_name && (
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:'0.72rem', color:C.text2, fontWeight:600 }}>{st.parent_name}</div>
+                    {st.parent_phone && <div style={{ fontSize:'0.7rem', color:C.text3 }}>{st.parent_phone}</div>}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -131,6 +179,7 @@ function DriverHome() {
     </div>
   );
 }
+
 
 // ── Trip ─────────────────────────────────────────────────────────────────────
 function DriverTrip() {
@@ -383,16 +432,39 @@ function DriverTrip() {
 
 // ── Students ─────────────────────────────────────────────────────────────────
 function DriverStudents() {
-  const [students, setStudents] = useState(DUMMY_STUDENTS);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  useEffect(() => { api.get('/students').then(d => Array.isArray(d) && d.length && setStudents(d)).catch(() => {}); }, []);
+
+  useEffect(() => {
+    api.get('/drivers/me').then(d => {
+      if (d?.id) {
+        return api.get(`/drivers/${d.id}/students`);
+      }
+      return [];
+    }).then(sts => {
+      if (Array.isArray(sts) && sts.length) setStudents(sts);
+      else setStudents(DUMMY_STUDENTS);
+    }).catch(() => setStudents(DUMMY_STUDENTS))
+      .finally(() => setLoading(false));
+  }, []);
+
   const filtered = students.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()) || s.school?.toLowerCase().includes(search.toLowerCase()));
+
   return (
     <div style={s.page}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
         <h2 style={s.pageTitle}>My Students ({students.length})</h2>
         <input style={{...s.input,width:'auto',flex:'0 0 220px'}} placeholder="Search students…" value={search} onChange={e=>setSearch(e.target.value)} />
       </div>
+      {loading && <div style={s.empty}>Loading students…</div>}
+      {!loading && students.length === 0 && (
+        <div style={{ ...s.card, textAlign:'center', color:C.text3 }}>
+          <div style={{ fontSize:'2rem', marginBottom:'0.75rem' }}>🎒</div>
+          <div style={{ fontWeight:600 }}>No students assigned yet</div>
+          <div style={{ fontSize:'0.85rem', marginTop:'0.5rem' }}>The admin will assign students to you. Check back later.</div>
+        </div>
+      )}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'1rem'}}>
         {filtered.map(st => (
           <div key={st.id} style={s.card}>
@@ -401,18 +473,20 @@ function DriverStudents() {
               <div style={{flex:1}}>
                 <div style={{fontWeight:700,color:C.text,marginBottom:'0.2rem'}}>{st.name}</div>
                 <div style={{color:C.text3,fontSize:'0.78rem',marginBottom:'0.3rem'}}>{st.school} · {st.grade}</div>
-                <div style={{color:C.text2,fontSize:'0.75rem',marginBottom:'0.25rem'}}>📍 {st.pickup_address}</div>
+                {st.pickup_address && <div style={{color:C.text2,fontSize:'0.75rem',marginBottom:'0.25rem'}}>📍 {st.pickup_address}</div>}
+                {st.drop_address && <div style={{color:C.text2,fontSize:'0.75rem',marginBottom:'0.25rem'}}>🏫 {st.drop_address}</div>}
                 {st.parent_name && <div style={{color:C.text3,fontSize:'0.72rem'}}>👨‍👩‍👧 {st.parent_name}</div>}
                 {st.parent_phone && <div style={{color:C.text3,fontSize:'0.72rem'}}>📞 {st.parent_phone}</div>}
               </div>
             </div>
           </div>
         ))}
-        {filtered.length === 0 && <div style={s.empty}>No students found.</div>}
+        {!loading && filtered.length === 0 && students.length > 0 && <div style={s.empty}>No students match search.</div>}
       </div>
     </div>
   );
 }
+
 
 // ── History ───────────────────────────────────────────────────────────────────
 function DriverHistory() {
