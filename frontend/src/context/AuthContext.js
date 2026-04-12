@@ -66,10 +66,12 @@ function bestRole(dbRole, metaRole, email) {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }) {
-  const [user,      setUser]      = useState(null);
-  const [profile,   setProfile]   = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [isDemoUser,setIsDemoUser]= useState(false);
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [bootStatus, setBootStatus] = useState('Initializing...');
+  const [showBypass, setShowBypass] = useState(false);
+  const [isDemoUser, setIsDemoUser] = useState(false);
 
   // When login() sets profile, block bootstrap() from overwriting it
   const loginSetRef = useRef(false);
@@ -79,11 +81,27 @@ export function AuthProvider({ children }) {
 
   // ── Bootstrap: run on page load / auth state change ────────────────────────
   async function bootstrap(session) {
+    console.log('[Auth] 🚀 Bootstrapping session...');
+    setBootStatus('Checking local session...');
+
+    // 10s Safety Timeout
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.warn('[Auth] ⏱️ Bootstrap timeout! Forcing entry.');
+        setBootStatus('Connection slow... proceeding anyway.');
+        setLoading(false);
+      }
+    }, 10000);
+
+    // Bypass link after 4s
+    const bypassTimer = setTimeout(() => setShowBypass(true), 4000);
+
     try {
       // ── No session → check demo localStorage ──────────────────────────────
       if (!session?.user) {
         const raw = localStorage.getItem('schuber-demo-session');
         if (raw) {
+          setBootStatus('Restoring demo session...');
           try {
             const demo = JSON.parse(raw);
             const dbProf = await fetchProfileRole(demo.id, demo.email);
@@ -108,6 +126,7 @@ export function AuthProvider({ children }) {
       // ── We have a real Supabase session ────────────────────────────────────
       setUser(session.user);
       setIsDemoUser(false);
+      setBootStatus(`Hello, ${session.user.email}. Loading profile...`);
 
       // If login() already set a correct profile, trust it — skip re-fetch
       if (loginSetRef.current) {
@@ -126,20 +145,15 @@ export function AuthProvider({ children }) {
 
 
       // ── RULE 1: Admin-only email enforcement ──────────────────────────────
-      // karenelisha0204@gmail.com is ALWAYS admin.
-      // Any other account that somehow gets admin role is forced to parent.
       const isAdminEmail = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
       // ── RULE 2: Role conflict — if user already has a DB role, respect it ─
-      // They cannot switch roles by picking a different one on the login page.
       const existingRole = dbProf?.role;
       let resolvedRole;
 
       if (isAdminEmail) {
-        // Real admin account — always admin, no exceptions
         resolvedRole = 'admin';
       } else if (existingRole && existingRole !== 'admin') {
-        // Existing parent/driver — their DB role wins, ignore pendingRole
         if (pendingRole && pendingRole !== existingRole) {
           console.warn(`[Auth] 🚫 ROLE CONFLICT: This account is already a '${existingRole}'. You tried to sign in as '${pendingRole}'.`);
           localStorage.setItem('schuber-role-conflict', `This account is registered as a ${existingRole}. Please sign in as ${existingRole}.`);
@@ -150,13 +164,11 @@ export function AuthProvider({ children }) {
         }
         resolvedRole = existingRole;
       } else {
-        // New user — use pendingRole from the role picker
         resolvedRole =
           pendingRole
           || resolvedRoleRef.current
           || bestRole(null, meta.role, email);
 
-        // Block anyone (other than admin email) from getting admin role
         if (resolvedRole === 'admin' && !isAdminEmail) {
           console.warn('[Auth] 🚫 Blocked non-admin email from getting admin role:', email);
           resolvedRole = null;
@@ -172,7 +184,6 @@ export function AuthProvider({ children }) {
         resolvedRole = 'parent';
       }
 
-      // Remember this role for any subsequent bootstrap() calls this session
       resolvedRoleRef.current = resolvedRole;
 
       // Persist profile + role to DB when new or roleless
@@ -192,7 +203,6 @@ export function AuthProvider({ children }) {
           console.log('[Auth] ✅ Profile saved successfully.');
         }
 
-        // New driver → flag for verification form
         if (resolvedRole === 'driver' && !existingRole) {
           localStorage.setItem('schuber-driver-setup', '1');
         }
@@ -205,21 +215,21 @@ export function AuthProvider({ children }) {
         full_name:  dbProf?.full_name ?? meta.full_name ?? email,
         phone:      dbProf?.phone     ?? meta.phone     ?? null,
         avatar_url: dbProf?.avatar_url ?? meta.avatar_url ?? null,
-        // Only drivers need a driver profile; others are 'complete' by default
         has_driver_profile: resolvedRole !== 'driver' || (dbProf?.driver_profile_exists ?? false),
         is_verified: dbProf?.is_verified ?? false,
       });
     } catch (err) {
-      console.error('[Auth] 💥 Bootstrap crashed:', err);
+      console.error('[Auth] ❌ Bootstrap failed:', err);
+      setBootStatus('Unexpected error during startup.');
     } finally {
-      // ✅ ESSENTIAL: Ensure loading ends so user isn't stuck on yellow screen
       setLoading(false);
+      clearTimeout(timer);
+      clearTimeout(bypassTimer);
     }
   }
 
   // ── Initialise on mount ────────────────────────────────────────────────────
   useEffect(() => {
-    // Fast path: demo session already in localStorage
     const raw = localStorage.getItem('schuber-demo-session');
     if (raw) {
       try {
@@ -232,7 +242,6 @@ export function AuthProvider({ children }) {
       } catch { localStorage.removeItem('schuber-demo-session'); }
     }
 
-    // Real Supabase session
     supabase.auth.getSession()
       .then(({ data: { session } }) => bootstrap(session))
       .catch(() => setLoading(false));
@@ -241,32 +250,24 @@ export function AuthProvider({ children }) {
       bootstrap(session);
     });
 
-    // Safety timeout
-    const t = setTimeout(() => setLoading(false), 6000);
-    return () => { subscription.unsubscribe(); clearTimeout(t); };
-  }, []); // intentionally empty — bootstrap is stable via useCallback pattern
+    return () => { subscription.unsubscribe(); };
+  }, []);
 
   // ── login() ────────────────────────────────────────────────────────────────
-  // ── login() — only used for demo accounts ─────────────────────────────────
-  // Real users sign in via Google (signInWithGoogle) which is handled
-  // automatically by Supabase onAuthStateChange.
   async function login(emailRaw, password) {
     const email = emailRaw?.trim().toLowerCase();
     loginSetRef.current = false;
     localStorage.removeItem('schuber-demo-session');
 
-    // ── Demo account fast-path ─────────────────────────────────────────────
     const demo = DEMO_ACCOUNTS[email];
     if (demo && demo.password === password) {
       console.log('[Auth] 🎭 demo login:', email, '→ role:', demo.role);
 
-      // Also try real Supabase auth for demo accounts (so DB queries work)
       try {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (!error && data?.user) {
           const meta    = data.user.user_metadata ?? {};
           const dbProf  = await fetchProfileRole(data.user.id, email);
-          // Use demo.role as guaranteed fallback — never let DB/metadata override known demo roles
           const role    = dbProf?.role || demo.role;
           const fullProfile = {
             id:        data.user.id,
@@ -285,7 +286,6 @@ export function AuthProvider({ children }) {
         }
       } catch { /* fall through to local demo */ }
 
-      // Local demo fallback (no internet / Supabase down)
       const demoProfile = { ...demo };
       localStorage.setItem('schuber-demo-session', JSON.stringify(demoProfile));
       loginSetRef.current = true;
@@ -302,7 +302,7 @@ export function AuthProvider({ children }) {
   // ── logout() ───────────────────────────────────────────────────────────────
   async function logout() {
     loginSetRef.current   = false;
-    resolvedRoleRef.current = null;   // clear cached role for next user
+    resolvedRoleRef.current = null;
     localStorage.removeItem('schuber-demo-session');
     localStorage.removeItem('schuber-pending-role');
     localStorage.removeItem('schuber-driver-setup');
@@ -350,14 +350,39 @@ export function AuthProvider({ children }) {
       getAuthHeader, refreshProfile,
     }}>
       {loading ? (
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1.5rem', textAlign:'center' }}>
-          <div style={{ width:40, height:40, border:'3px solid #FDE68A', borderTopColor:'#F59E0B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: '#FFFBF0',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          border: '10px solid #F59E0B'
+        }}>
+          <div style={{
+            width: 64,
+            height: 64,
+            border: '8px solid #FDE68A',
+            borderTopColor: '#F59E0B',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            marginBottom: '2rem'
+          }} />
           <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
-          <div>
-            <div style={{ color:'#D97706', fontWeight:600, fontFamily:'Plus Jakarta Sans,sans-serif', fontSize:'1.1rem' }}>Loading Schuber…</div>
-            {(!process.env.REACT_APP_SUPABASE_URL) && (
-              <div style={{ color:'#92400E', fontSize:'0.8rem', marginTop:'0.5rem', opacity:0.8 }}>
-                Configuration missing. Check Vercel logs.
+                padding: '1rem', 
+                background: '#FEF3C7', 
+                border: '1px solid #FDE68A', 
+                borderRadius: 12,
+                textAlign: 'center',
+                maxWidth: 300,
+                animation: 'fadeIn 0.5s ease'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#92400E', marginBottom: '0.75rem', lineHeight: 1.4 }}>
+                  Taking longer than usual? The connection might be slow.
+                </div>
               </div>
             )}
           </div>

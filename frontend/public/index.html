@@ -20,6 +20,26 @@
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    
+    <!-- Diagnostic Banner (Temporary) -->
+    <div id="diag-banner" style="position:fixed; top:0; left:0; width:100%; height:4px; background:#F59E0B; z-index:10000;"></div>
+    
     <div id="root"></div>
+
+    <script>
+      // Global error listener to catch "blank page" issues
+      window.onerror = function(message, source, lineno, colno, error) {
+        var banner = document.getElementById('diag-banner');
+        if (banner) {
+          banner.style.height = 'auto';
+          banner.style.padding = '10px';
+          banner.style.background = '#DC2626';
+          banner.style.color = '#fff';
+          banner.style.fontSize = '12px';
+          banner.style.fontFamily = 'monospace';
+          banner.innerHTML = '🛑 ERROR: ' + message + ' (' + source + ':' + lineno + ')';
+        }
+      };
+    </script>
   </body>
 </html>
