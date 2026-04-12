@@ -11,79 +11,89 @@ import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import DriverVerificationPage from './pages/DriverVerificationPage';
 
+function LoadingScreen({ text }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1rem' }}>
+      <div style={{ width:44, height:44, border:'4px solid #FDE68A', borderTopColor:'#F59E0B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ color:'#D97706', fontWeight:700, fontSize:'1.1rem', fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
+        {text || 'Schuber is loading...'}
+      </div>
+    </div>
+  );
+}
+
 // 🔐 Protected Route — strict role enforcement
 function ProtectedRoute({ children, roles }) {
   const { user, profile, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FFFBF0', flexDirection:'column', gap:'1rem' }}>
-        <div style={{ width:40, height:40, border:'3px solid #FDE68A', borderTopColor:'#F59E0B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div style={{ color:'#D97706', fontWeight:600, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>Loading Schuber…</div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen text="Verifying access..." />;
 
   // If not logged in at all, go to login
   if (!user) return <Navigate to="/login" replace />;
 
+  const role = profile?.role;
+
   // ✅ ROLE CHECK — redirect to correct dashboard if role mismatch
-  if (roles && profile?.role && !roles.includes(profile.role)) {
-    return <Navigate to={`/${profile.role}`} replace />;
+  if (roles && role && !roles.includes(role)) {
+    return <Navigate to={`/${role}`} replace />;
   }
 
   // ✅ DRIVER SETUP CHECK — redirect if driver profile missing
-  if (profile?.role === 'driver' && !profile.has_driver_profile) {
+  if (role === 'driver' && !profile.has_driver_profile) {
     return <Navigate to="/driver-verification" replace />;
   }
-
 
   return children;
 }
 
 function AppRoutes() {
   const { user, profile, loading } = useAuth();
+  const role = profile?.role;
 
-  if (loading || (user && !profile)) {
-    return (
-      <div style={{ textAlign:'center', marginTop:'50px', fontFamily:"'Plus Jakarta Sans',sans-serif", color:'#D97706' }}>
-        Loading app…
-      </div>
-    );
+  if (loading || (user && !role)) {
+    return <LoadingScreen text="Entering Schuber..." />;
   }
 
   return (
     <Routes>
       {/* HOME */}
       <Route path="/" element={
-        user && profile?.role
-          ? (profile.role === 'driver' && !profile.has_driver_profile
+        !user ? <LandingPage /> : (
+          !role ? <LoadingScreen text="Finalizing session..." /> : (
+            role === 'driver' && !profile.has_driver_profile
               ? <Navigate to="/driver-verification" replace />
-              : <Navigate to={`/${profile.role}`} replace />)
-          : <LandingPage />
-
+              : <Navigate to={`/${role}`} replace />
+          )
+        )
       } />
 
+      {/* AUTH */}
       <Route path="/login" element={
-        user && profile?.role ? (
-          profile.role === 'driver' && !profile.has_driver_profile 
-            ? <Navigate to="/driver-verification" replace />
-            : <Navigate to={`/${profile.role}`} replace />
-        ) : <LoginPage />
+        !user ? <LoginPage /> : (
+          !role ? <LoadingScreen text="Signing you in..." /> : (
+            role === 'driver' && !profile.has_driver_profile 
+              ? <Navigate to="/driver-verification" replace />
+              : <Navigate to={`/${role}`} replace />
+          )
+        )
       } />
       <Route path="/register" element={
-        user && profile?.role ? (
-          profile.role === 'driver' && !profile.has_driver_profile 
-            ? <Navigate to="/driver-verification" replace />
-            : <Navigate to={`/${profile.role}`} replace />
-        ) : <RegisterPage />
+        !user ? <RegisterPage /> : (
+          !role ? <LoadingScreen text="Creating account..." /> : (
+            role === 'driver' && !profile.has_driver_profile 
+              ? <Navigate to="/driver-verification" replace />
+              : <Navigate to={`/${role}`} replace />
+          )
+        )
       } />
 
-
-
       {/* PUBLIC */}
-      <Route path="/driver-verification" element={<DriverVerificationPage />} />
+      <Route path="/driver-verification" element={
+        <ProtectedRoute roles={['driver']}>
+          <DriverVerificationPage />
+        </ProtectedRoute>
+      } />
 
       {/* PROTECTED — strict role enforcement */}
       <Route path="/parent/*" element={

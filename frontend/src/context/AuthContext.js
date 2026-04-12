@@ -86,13 +86,22 @@ export function AuthProvider({ children }) {
         if (raw) {
           try {
             const demo = JSON.parse(raw);
+            const dbProf = await fetchProfileRole(demo.id, demo.email);
+            
             setUser({ id: demo.id, email: demo.email });
-            setProfile(demo);
             setIsDemoUser(true);
+            setProfile({
+              ...demo,
+              ...(dbProf || {}),
+              has_driver_profile: dbProf?.driver_profile_exists ?? false,
+              is_verified: dbProf?.is_verified ?? false,
+            });
+            setLoading(false);
             return;
           } catch { localStorage.removeItem('schuber-demo-session'); }
         }
         if (!loginSetRef.current) { setUser(null); setProfile(null); }
+        setLoading(false);
         return;
       }
 
@@ -304,9 +313,16 @@ export function AuthProvider({ children }) {
   }
 
   async function refreshProfile() {
-    if (isDemoUser || !user) return;
+    if (!user) return;
     const dbProf = await fetchProfileRole(user.id, user.email).catch(() => null);
-    if (dbProf) setProfile(p => ({ ...p, ...dbProf }));
+    if (dbProf) {
+      setProfile(p => ({
+        ...p,
+        ...dbProf,
+        has_driver_profile: dbProf.driver_profile_exists ?? p?.has_driver_profile,
+        is_verified: dbProf.is_verified ?? p?.is_verified,
+      }));
+    }
   }
 
   return (
