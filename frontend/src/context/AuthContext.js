@@ -11,7 +11,7 @@ const DEMO_ACCOUNTS = {
   'admin@schuber.com':   { password:'admin123',  role:'admin',  full_name:'Schuber Admin', id:'demo-admin-001', email:'admin@schuber.com', phone:'+91 98765 00000' },
 };
 
-// Email → role mapping for known accounts (reliable fallback when RLS blocks profile reads)
+// Reliable role lookup by email — works even when RLS blocks DB reads
 const KNOWN_ROLES = {
   'priya@example.com': 'parent',
   'suresh@example.com': 'driver',
@@ -19,11 +19,13 @@ const KNOWN_ROLES = {
 };
 
 function resolveRole(dbRole, userMetadata, email) {
-  // Priority: DB profile role → user_metadata role → known account role → 'parent'
-  if (dbRole && dbRole !== 'parent') return dbRole;  // explicit non-default role from DB
-  if (dbRole === 'parent') return dbRole;             // explicitly set to parent in DB
+  // 1. DB role is most authoritative
+  if (dbRole) return dbRole;
+  // 2. user_metadata from Supabase Auth
   if (userMetadata?.role) return userMetadata.role;
+  // 3. Known email mapping (reliable fallback)
   if (email && KNOWN_ROLES[email.toLowerCase()]) return KNOWN_ROLES[email.toLowerCase()];
+  // 4. Default
   return 'parent';
 }
 
@@ -34,8 +36,8 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState(null);
   const [isDemoUser, setIsDemoUser] = useState(false);
 
-  // Flag: when login() sets profile manually, bootstrap should NOT overwrite it
-  const loginSetProfileRef = useRef(false);
+  // Tracks the profile set by login() — bootstrap must never overwrite this
+  const manualProfileRef = useRef(null);
 
   const bootstrap = useCallback(async (session) => {
     try {
@@ -53,14 +55,11 @@ export function AuthProvider({ children }) {
           } catch { localStorage.removeItem('schuber-demo-session'); }
           return;
         }
-        setUser(null);
-        setProfile(null);
-        return;
-      }
-
-      // If login() already set the profile, don't overwrite it
-      if (loginSetProfileRef.current) {
-        loginSetProfileRef.current = false;
+        // Only clear state if login() didn't just set it
+        if (!manualProfileRef.current) {
+          setUser(null);
+          setProfile(null);
+        }
         return;
       }
 
@@ -68,7 +67,14 @@ export function AuthProvider({ children }) {
       setUser(currentUser);
       setIsDemoUser(false);
 
-      // Try fetching profile from DB
+      // If login() manually set the profile, DON'T overwrite — just use it
+      if (manualProfileRef.current) {
+        console.log('[Auth] bootstrap: using profile set by login()', manualProfileRef.current.role);
+        setProfile(manualProfileRef.current);
+        return;
+      }
+
+      // Otherwise, fetch profile from DB
       let prof = null;
       try {
         prof = await getProfile(currentUser.id);
@@ -76,24 +82,24 @@ export function AuthProvider({ children }) {
         console.warn('[Auth] getProfile failed:', err.message);
       }
 
+      const role = resolveRole(prof?.role, currentUser.user_metadata, currentUser.email);
+
       if (prof) {
-        // Got profile from DB
+        prof = { ...prof, role }; // ensure resolved role
         if (!prof.avatar_url && currentUser.user_metadata?.avatar_url) {
           prof = { ...prof, avatar_url: currentUser.user_metadata.avatar_url };
         }
         setProfile(prof);
       } else {
-        // Profile fetch failed (likely RLS) — build from user_metadata + known roles
-        const role = resolveRole(null, currentUser.user_metadata, currentUser.email);
-        const fallback = {
+        // Build profile from metadata
+        setProfile({
           id: currentUser.id,
           role,
           full_name: currentUser.user_metadata?.full_name ?? currentUser.email ?? 'User',
           email: currentUser.email,
           avatar_url: currentUser.user_metadata?.avatar_url ?? null,
           phone: currentUser.user_metadata?.phone ?? null,
-        };
-        setProfile(fallback);
+        });
       }
     } catch (err) {
       setAuthError(err?.message ?? 'Authentication error');
@@ -122,6 +128,7 @@ export function AuthProvider({ children }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] onAuthStateChange:', event);
       bootstrap(session);
     });
 
@@ -130,14 +137,19 @@ export function AuthProvider({ children }) {
   }, [bootstrap]);
 
   async function login(email, password) {
+    // Clear any previous manual profile and stale sessions
+    manualProfileRef.current = null;
+    localStorage.removeItem('schuber-demo-session');
+
     // Try real Supabase login first
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (!error && data?.user) {
         const prof = await getProfile(data.user.id).catch(() => null);
         const role = resolveRole(prof?.role, data.user.user_metadata, email);
+
         const fullProfile = prof
-          ? { ...prof, role }  // ensure we use resolved role
+          ? { ...prof, role }
           : {
               id: data.user.id, role, email: data.user.email,
               full_name: data.user.user_metadata?.full_name ?? data.user.email,
@@ -145,8 +157,10 @@ export function AuthProvider({ children }) {
               phone: data.user.user_metadata?.phone ?? null,
             };
 
-        // Set state IMMEDIATELY — and tell bootstrap to skip overwriting
-        loginSetProfileRef.current = true;
+        console.log('[Auth] login success:', email, '→ role:', role);
+
+        // Store in ref so bootstrap doesn't overwrite
+        manualProfileRef.current = fullProfile;
         setUser(data.user);
         setProfile(fullProfile);
         setIsDemoUser(false);
@@ -154,7 +168,6 @@ export function AuthProvider({ children }) {
         return { ...data.user, role };
       }
     } catch (e) {
-      // If Supabase is unreachable, fall through to demo
       console.warn('[Auth] Supabase login failed, trying demo:', e.message);
     }
 
@@ -162,8 +175,9 @@ export function AuthProvider({ children }) {
     const demo = DEMO_ACCOUNTS[email?.toLowerCase()];
     if (demo && demo.password === password) {
       const demoProfile = { ...demo };
+      console.log('[Auth] demo login:', email, '→ role:', demo.role);
       localStorage.setItem('schuber-demo-session', JSON.stringify(demoProfile));
-      loginSetProfileRef.current = true;
+      manualProfileRef.current = demoProfile;
       setUser({ id: demo.id, email: demo.email });
       setProfile(demoProfile);
       setIsDemoUser(true);
@@ -185,61 +199,49 @@ export function AuthProvider({ children }) {
     if (error) throw error;
 
     if (data.user) {
-      // Upsert profile with role
       await supabase.from('profiles').upsert(
         { id: data.user.id, role, full_name: fullName, email, phone },
         { onConflict:'id' }
       ).catch(e => console.error('[Auth] Profile upsert failed:', e.message));
 
-      // If driver, auto-create driver record
       if (role === 'driver') {
         await supabase.from('drivers').insert({
           user_id: data.user.id,
-          verified: false,
-          is_online: false,
-          rating: 0,
-          capacity: 12,
+          verified: false, is_online: false, rating: 0, capacity: 12,
         }).catch(e => console.error('[Auth] Driver insert failed:', e.message));
       }
 
-      // Check if session exists (email might be auto-confirmed)
       if (data.session) {
         const prof = { id: data.user.id, role, full_name: fullName, email, phone };
-        loginSetProfileRef.current = true;
+        manualProfileRef.current = prof;
         setUser(data.user);
         setProfile(prof);
         setLoading(false);
         return data.user;
       }
     }
-
     return data.user;
   }
 
   async function logout() {
-    loginSetProfileRef.current = false;
-    if (isDemoUser) {
-      localStorage.removeItem('schuber-demo-session');
-      setUser(null);
-      setProfile(null);
-      setIsDemoUser(false);
-      return;
-    }
-    await signOut();
+    manualProfileRef.current = null;
     localStorage.removeItem('schuber-demo-session');
     setUser(null);
     setProfile(null);
+    setIsDemoUser(false);
+    if (!isDemoUser) {
+      await signOut().catch(() => {});
+    }
   }
 
   async function getAuthHeader() {
-    if (isDemoUser) return { 'X-Demo-User': profile?.role || 'parent', 'Content-Type':'application/json' };
+    if (isDemoUser) return { 'X-Demo-User': profile?.id || 'demo', 'X-Demo-Role': profile?.role || 'parent', 'Content-Type':'application/json' };
     const { data: { session } } = await supabase.auth.getSession();
-    return session ? { Authorization:`Bearer ${session.access_token}` } : {};
+    return session ? { Authorization:`Bearer ${session.access_token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' };
   }
 
   async function refreshProfile() {
-    if (isDemoUser) return;
-    if (!user) return;
+    if (isDemoUser || !user) return;
     try { const prof = await getProfile(user.id); if (prof) setProfile(prof); }
     catch (err) { console.error('[Auth] refreshProfile error:', err); }
   }
