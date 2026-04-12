@@ -22,16 +22,16 @@ const ADMIN_EMAIL = 'karenelisha0204@gmail.com';
 
 // ── Demo accounts (testing only) ──────────────────────────────────────────────
 const DEMO_ACCOUNTS = {
-  'priya@example.com':  { password:'parent123', role:'parent', full_name:'Priya Sharma',   id:'demo-parent-001', email:'priya@example.com',  phone:'+91 98765 43210' },
-  'suresh@example.com': { password:'driver123', role:'driver', full_name:'Suresh Kumar',   id:'demo-driver-001', email:'suresh@example.com', phone:'+91 98765 99999' },
-  'admin@schuber.com':  { password:'admin123',  role:'admin',  full_name:'Schuber Admin',  id:'demo-admin-001',  email:'admin@schuber.com',  phone:'+91 98765 00000' },
+  'priya@example.com': { password: 'parent123', role: 'parent', full_name: 'Priya Sharma', id: 'demo-parent-001', email: 'priya@example.com', phone: '+91 98765 43210' },
+  'suresh@example.com': { password: 'driver123', role: 'driver', full_name: 'Suresh Kumar', id: 'demo-driver-001', email: 'suresh@example.com', phone: '+91 98765 99999' },
+  'admin@schuber.com': { password: 'admin123', role: 'admin', full_name: 'Schuber Admin', id: 'demo-admin-001', email: 'admin@schuber.com', phone: '+91 98765 00000' },
 };
 
 // Guaranteed role for known e-mails
 const KNOWN_ROLES = {
-  'priya@example.com':       'parent',
-  'suresh@example.com':      'driver',
-  'admin@schuber.com':       'admin',
+  'priya@example.com': 'parent',
+  'suresh@example.com': 'driver',
+  'admin@schuber.com': 'admin',
   [ADMIN_EMAIL.toLowerCase()]: 'admin', // real admin always gets admin
 };
 
@@ -42,7 +42,7 @@ async function fetchProfileRole(userId, email) {
       .select('role, full_name, phone, avatar_url')
       .eq('id', userId)
       .single();
-    
+
     if (profile?.role === 'driver') {
       const { data: driver } = await supabase
         .from('drivers')
@@ -51,15 +51,15 @@ async function fetchProfileRole(userId, email) {
         .maybeSingle();
       return { ...profile, driver_profile_exists: !!driver, is_verified: driver?.verified ?? false };
     }
-    
+
     if (profile?.role) return profile;
-  } catch (_) {}
+  } catch (_) { }
   return null;
 }
 
 function bestRole(dbRole, metaRole, email) {
-  if (dbRole)   return dbRole;
-  if (metaRole && ['parent','driver','admin'].includes(metaRole)) return metaRole;
+  if (dbRole) return dbRole;
+  if (metaRole && ['parent', 'driver', 'admin'].includes(metaRole)) return metaRole;
   if (email && KNOWN_ROLES[email?.toLowerCase()]) return KNOWN_ROLES[email.toLowerCase()];
   return null; // no default — user must choose a role
 }
@@ -105,7 +105,7 @@ export function AuthProvider({ children }) {
           try {
             const demo = JSON.parse(raw);
             const dbProf = await fetchProfileRole(demo.id, demo.email);
-            
+
             setUser({ id: demo.id, email: demo.email });
             setIsDemoUser(true);
             setProfile({
@@ -135,9 +135,9 @@ export function AuthProvider({ children }) {
       }
 
       // Build profile from DB + metadata
-      const meta        = session.user.user_metadata ?? {};
-      const email       = session.user.email ?? '';
-      const dbProf      = await fetchProfileRole(session.user.id, email);
+      const meta = session.user.user_metadata ?? {};
+      const email = session.user.email ?? '';
+      const dbProf = await fetchProfileRole(session.user.id, email);
 
       const pendingRole = localStorage.getItem('schuber-pending-role');
       console.log('[Auth] 🔍 Bootstrap:', { email, dbProf: dbProf?.role, pendingRole });
@@ -157,7 +157,7 @@ export function AuthProvider({ children }) {
         if (pendingRole && pendingRole !== existingRole) {
           console.warn(`[Auth] 🚫 ROLE CONFLICT: This account is already a '${existingRole}'. You tried to sign in as '${pendingRole}'.`);
           localStorage.setItem('schuber-role-conflict', `This account is registered as a ${existingRole}. Please sign in as ${existingRole}.`);
-          await signOut().catch(() => {});
+          await signOut().catch(() => { });
 
           setUser(null); setProfile(null); setLoading(false);
           return;
@@ -173,7 +173,7 @@ export function AuthProvider({ children }) {
           console.warn('[Auth] 🚫 Blocked non-admin email from getting admin role:', email);
           resolvedRole = null;
           localStorage.setItem('schuber-role-conflict', 'Admin access is restricted.');
-          await signOut().catch(() => {});
+          await signOut().catch(() => { });
           setUser(null); setProfile(null); setLoading(false);
           return;
         }
@@ -190,11 +190,11 @@ export function AuthProvider({ children }) {
       if (pendingRole || !existingRole) {
         console.log('[Auth] 📝 Saving profile to DB:', { id: session.user.id, role: resolvedRole });
         const { error: upsertErr } = await supabase.from('profiles').upsert({
-          id:        session.user.id,
+          id: session.user.id,
           email,
-          role:      resolvedRole || 'parent',
+          role: resolvedRole || 'parent',
           full_name: dbProf?.full_name || meta.full_name || meta.name || email,
-          phone:     dbProf?.phone     || meta.phone     || null,
+          phone: dbProf?.phone || meta.phone || null,
         }, { onConflict: 'id' });
 
         if (upsertErr) {
@@ -209,11 +209,11 @@ export function AuthProvider({ children }) {
       }
 
       setProfile({
-        id:         session.user.id,
+        id: session.user.id,
         email,
-        role:       resolvedRole,
-        full_name:  dbProf?.full_name ?? meta.full_name ?? email,
-        phone:      dbProf?.phone     ?? meta.phone     ?? null,
+        role: resolvedRole,
+        full_name: dbProf?.full_name ?? meta.full_name ?? email,
+        phone: dbProf?.phone ?? meta.phone ?? null,
         avatar_url: dbProf?.avatar_url ?? meta.avatar_url ?? null,
         has_driver_profile: resolvedRole !== 'driver' || (dbProf?.driver_profile_exists ?? false),
         is_verified: dbProf?.is_verified ?? false,
@@ -266,15 +266,15 @@ export function AuthProvider({ children }) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (!error && data?.user) {
-          const meta    = data.user.user_metadata ?? {};
-          const dbProf  = await fetchProfileRole(data.user.id, email);
-          const role    = dbProf?.role || demo.role;
+          const meta = data.user.user_metadata ?? {};
+          const dbProf = await fetchProfileRole(data.user.id, email);
+          const role = dbProf?.role || demo.role;
           const fullProfile = {
-            id:        data.user.id,
+            id: data.user.id,
             email,
             role,
             full_name: dbProf?.full_name ?? meta.full_name ?? demo.full_name,
-            phone:     dbProf?.phone     ?? meta.phone     ?? demo.phone,
+            phone: dbProf?.phone ?? meta.phone ?? demo.phone,
           };
           loginSetRef.current = true;
           setUser(data.user);
@@ -301,7 +301,7 @@ export function AuthProvider({ children }) {
 
   // ── logout() ───────────────────────────────────────────────────────────────
   async function logout() {
-    loginSetRef.current   = false;
+    loginSetRef.current = false;
     resolvedRoleRef.current = null;
     localStorage.removeItem('schuber-demo-session');
     localStorage.removeItem('schuber-pending-role');
@@ -309,15 +309,15 @@ export function AuthProvider({ children }) {
     setUser(null);
     setProfile(null);
     setIsDemoUser(false);
-    if (!isDemoUser) await signOut().catch(() => {});
+    if (!isDemoUser) await signOut().catch(() => { });
   }
 
   async function getAuthHeader() {
     if (isDemoUser) {
       return {
-        'Content-Type':   'application/json',
-        'X-Demo-Role':    profile?.role || 'parent',
-        'X-Demo-User':    profile?.id   || 'demo',
+        'Content-Type': 'application/json',
+        'X-Demo-Role': profile?.role || 'parent',
+        'X-Demo-User': profile?.id || 'demo',
       };
     }
     const { data: { session } } = await supabase.auth.getSession();
@@ -372,20 +372,22 @@ export function AuthProvider({ children }) {
             marginBottom: '2rem'
           }} />
           <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
-                padding: '1rem', 
-                background: '#FEF3C7', 
-                border: '1px solid #FDE68A', 
-                borderRadius: 12,
-                textAlign: 'center',
-                maxWidth: 300,
-                animation: 'fadeIn 0.5s ease'
-              }}>
-                <div style={{ fontSize: '0.75rem', color: '#92400E', marginBottom: '0.75rem', lineHeight: 1.4 }}>
-                  Taking longer than usual? The connection might be slow.
-                </div>
+
+          {showBypass && (
+            <div style={{
+              padding: '1rem',
+              background: '#FEF3C7',
+              border: '1px solid #FDE68A',
+              borderRadius: 12,
+              textAlign: 'center',
+              maxWidth: 300,
+              animation: 'fadeIn 0.5s ease'
+            }}>
+              <div style={{ fontSize: '0.75rem', color: '#92400E', marginBottom: '0.75rem', lineHeight: 1.4 }}>
+                Taking longer than usual? The connection might be slow.
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : children}
     </AuthContext.Provider>
