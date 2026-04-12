@@ -58,6 +58,9 @@ export function AuthProvider({ children }) {
 
   // When login() sets profile, block bootstrap() from overwriting it
   const loginSetRef = useRef(false);
+  // Remembers the last successfully resolved role across multiple bootstrap() calls
+  // (fixes OAuth double-fire race condition)
+  const resolvedRoleRef = useRef(null);
 
   // ── Bootstrap: run on page load / auth state change ────────────────────────
   async function bootstrap(session) {
@@ -93,24 +96,34 @@ export function AuthProvider({ children }) {
       const email       = session.user.email ?? '';
       const dbProf      = await fetchProfileRole(session.user.id, email);
 
-      // Resolve role — priority: pending localStorage → DB profile → user_metadata → known email
-      // pendingRole is set by the role selector on login/register page before Google OAuth
+      // Resolve role — priority:
+      //  1. pendingRole (role picker before Google OAuth)
+      //  2. resolvedRoleRef (last role this session — survives double auth-state-change fires)
+      //  3. DB profile role
+      //  4. user_metadata / known email map
       const pendingRole = localStorage.getItem('schuber-pending-role');
-      const role = pendingRole
+      const role =
+        pendingRole
+        || resolvedRoleRef.current          // ← survives second bootstrap() call
         || dbProf?.role
         || bestRole(null, meta.role, email);
 
       if (!role) console.warn('[Auth] ⚠️  No role resolved for', email);
+
+      // Remember this role for any subsequent bootstrap() calls this session
+      if (role) resolvedRoleRef.current = role;
 
       // Persist role to profiles table when:
       //  - user just picked a role (pendingRole set), OR
       //  - profile row has no role yet
       if (pendingRole || !dbProf?.role) {
         localStorage.removeItem('schuber-pending-role');
+        // Never downgrade driver/admin to parent accidentally
+        const safeRole = (dbProf?.role && dbProf.role !== 'parent') ? dbProf.role : (role || 'parent');
         await supabase.from('profiles').upsert({
           id:        session.user.id,
           email,
-          role:      role || 'parent',
+          role:      safeRole,
           full_name: dbProf?.full_name || meta.full_name || meta.name || email,
           phone:     dbProf?.phone     || meta.phone     || null,
         }, { onConflict: 'id' }).catch(() => {});
@@ -220,8 +233,11 @@ export function AuthProvider({ children }) {
 
   // ── logout() ───────────────────────────────────────────────────────────────
   async function logout() {
-    loginSetRef.current = false;
+    loginSetRef.current   = false;
+    resolvedRoleRef.current = null;   // clear cached role for next user
     localStorage.removeItem('schuber-demo-session');
+    localStorage.removeItem('schuber-pending-role');
+    localStorage.removeItem('schuber-driver-setup');
     setUser(null);
     setProfile(null);
     setIsDemoUser(false);
