@@ -118,8 +118,9 @@ function ParentHome() {
 
 // ── Tracking ─────────────────────────────────────────────────────────────────
 function ParentTracking() {
-  const [students, setStudents] = useState(DUMMY_STUDENTS);
-  const [activeTrip, setActiveTrip] = useState(DUMMY_ACTIVE);
+  const [students, setStudents] = useState([]);
+  const [activeTrip, setActiveTrip] = useState(null);
+
   const [routes, setRoutes] = useState([]);
   const [showRoutePanel, setShowRoutePanel] = useState(false);
   const [routeForm, setRouteForm] = useState({ name:'', stops:'' });
@@ -535,7 +536,8 @@ function ParentSubscription() {
 
 // ── Lost & Found ──────────────────────────────────────────────────────────────
 function ParentLostItem() {
-  const [items, setItems] = useState(DUMMY_LOST);
+  const [items, setItems] = useState([]);
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ item:'', description:'' });
   const [saving, setSaving] = useState(false);

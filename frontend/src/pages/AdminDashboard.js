@@ -112,8 +112,13 @@ function AdminOverview() {
 
 // ── Fleet Map (PB-45) ─────────────────────────────────────────────────────────
 function AdminFleet() {
-  const [drivers] = useState(DUMMY_DRIVERS);
+  const [drivers, setDrivers] = useState([]);
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    getAllDrivers().then(setDrivers).catch(() => []);
+  }, []);
+
 
   return (
     <div style={s.page}>
@@ -399,7 +404,10 @@ function AdminLostFound() {
 
 // ── Reports (PB-61) ───────────────────────────────────────────────────────────
 function AdminReports() {
+  const [drivers, setDrivers] = useState([]);
+  useEffect(() => { getAllDrivers().then(setDrivers).catch(() => []); }, []);
   const today = new Date().toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' });
+
 
   return (
     <div style={s.page}>
@@ -421,7 +429,7 @@ function AdminReports() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.25rem' }}>
         <div style={s.card}>
           <h3 style={s.cardTitle}>Driver Performance</h3>
-          {DUMMY_DRIVERS.map(d => (
+          {drivers.map(d => (
             <div key={d.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.6rem 0', borderBottom:`1px solid ${C.border}` }}>
               <div style={{ fontSize:'0.875rem', color:C.text, fontWeight:500 }}>{d.name}</div>
               <div style={{ display:'flex', gap:'0.5rem', alignItems:'center' }}>
@@ -461,7 +469,8 @@ function AdminReports() {
 
 // ── Drivers ───────────────────────────────────────────────────────────────────
 function AdminDrivers() {
-  const [drivers, setDrivers] = useState(DUMMY_DRIVERS);
+  const [drivers, setDrivers] = useState([]);
+
   const [msg, setMsg] = useState('');
 
   useEffect(() => {

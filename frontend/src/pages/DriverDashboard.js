@@ -555,7 +555,8 @@ function DriverPenalties() {
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 function DriverProfile() {
-  const [driver, setDriver] = useState(DUMMY_DRIVER);
+  const [driver, setDriver] = useState(null);
+
   const [form, setForm] = useState({ license_no:'', vehicle_no:'', vehicle_model:'', capacity:'', route:'', phone:'' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
