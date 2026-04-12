@@ -21,7 +21,6 @@ app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', service: 'Schuber API' })
 );
 
-const { authenticate: auth } = require('./middleware');
 const supabase = require('./db');
 
 // ── Subscription ──────────────────────────────────────────
