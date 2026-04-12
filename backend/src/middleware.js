@@ -6,6 +6,38 @@ async function authenticate(req, res, next) {
   const demoRole = req.headers['x-demo-role'];
   const demoUser = req.headers['x-demo-user'];
   if (demoRole && demoUser) {
+    // Map demo IDs to real database user IDs
+    const DEMO_EMAILS = {
+      'demo-parent-001': 'priya@example.com',
+      'demo-driver-001': 'suresh@example.com',
+      'demo-admin-001':  'admin@schuber.com',
+      'parent': 'priya@example.com',
+      'driver': 'suresh@example.com',
+      'admin':  'admin@schuber.com',
+    };
+
+    const email = DEMO_EMAILS[demoUser] || DEMO_EMAILS[demoRole];
+    if (email) {
+      // Look up real user ID from profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (profile) {
+        req.user = {
+          id: profile.id,
+          role: profile.role || demoRole,
+          full_name: profile.full_name,
+          email: profile.email,
+          phone: profile.phone,
+        };
+        return next();
+      }
+    }
+
+    // Fallback: use demo profile without real ID
     const DEMO_PROFILES = {
       'demo-parent-001': { id:'demo-parent-001', role:'parent', full_name:'Priya Sharma', email:'priya@example.com' },
       'demo-driver-001': { id:'demo-driver-001', role:'driver', full_name:'Suresh Kumar', email:'suresh@example.com' },

@@ -65,13 +65,13 @@ router.post('/', auth, async (req, res) => {
   if (req.user.role !== 'parent')
     return res.status(403).json({ error: 'Forbidden' });
 
-  const { name, school, grade } = req.body;
+  const { name, school, grade, pickup_address, drop_address } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
 
   try {
     const { data: student, error } = await supabase
       .from('students')
-      .insert({ name, school, grade, parent_id: req.user.id })
+      .insert({ name, school, grade, pickup_address, drop_address, parent_id: req.user.id })
       .select()
       .single();
 
