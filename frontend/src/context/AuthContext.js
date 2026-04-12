@@ -13,7 +13,7 @@ const DEMO_ACCOUNTS = {
 
 const DEFAULT_PROFILE_FALLBACK = (user) => ({
   id: user.id,
-  role: 'parent',
+  role: user.user_metadata?.role ?? 'parent',
   full_name: user.user_metadata?.full_name ?? user.email ?? 'User',
   email: user.email,
   avatar_url: user.user_metadata?.avatar_url ?? null,
@@ -112,7 +112,19 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (!error && data?.user) {
         const prof = await getProfile(data.user.id).catch(() => null);
-        return { ...data.user, role: prof?.role ?? 'parent' };
+        const role = prof?.role ?? data.user.user_metadata?.role ?? 'parent';
+        const fullProfile = prof || {
+          id: data.user.id, role, email: data.user.email,
+          full_name: data.user.user_metadata?.full_name ?? data.user.email,
+          avatar_url: data.user.user_metadata?.avatar_url ?? null,
+          phone: data.user.user_metadata?.phone ?? null,
+        };
+        // Set state IMMEDIATELY so ProtectedRoute sees correct role before navigation
+        setUser(data.user);
+        setProfile(fullProfile);
+        setIsDemoUser(false);
+        setLoading(false);
+        return { ...data.user, role };
       }
     } catch (e) {
       // If Supabase is unreachable, fall through to demo
